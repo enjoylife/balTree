@@ -3,6 +3,7 @@ package gotree
 import (
 	"fmt"
 	"math/rand"
+	"runtime"
 	"testing"
 )
 
@@ -23,8 +24,10 @@ func inc(t *testing.T) func(key interface{}, value interface{}) {
 		}
 	}
 }
+
 func TestInsertAndDelete(t *testing.T) {
 
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	eq := func(a interface{}, b interface{}) {
 		if a.(int) != b.(int) {
 			t.Errorf("%d is not equal to %d", a, b)
@@ -52,26 +55,30 @@ func TestInsertAndDelete(t *testing.T) {
 		}
 	}
 	_ = eq
+	_ = tn
+	_ = fn
+	_ = f
+	_ = tr
 
 	r := rand.New(rand.NewSource(int64(5)))
 	mem := make(map[int]int)
 	tree := New(testCmp)
-	iterations := 10000000
+	iterations := 1000
 
 	for i := 0; i < iterations; i++ {
 		item := r.Int()
 		which := r.NormFloat64()
-		if which < 0 {
+		if which > 0 {
 			old, ok := mem[item]
 			if ok {
 				// we have already inputed the value
-				check := tree.Insert(item, item)
+				check, _ := tree.Insert(item, item)
 				fn(check)
 				eq(check, old)
 			} else {
 				mem[item] = item
 				// not in yet
-				check := tree.Insert(item, item)
+				check, _ := tree.Insert(item, item)
 				tn(check)
 			}
 		} else {
@@ -93,11 +100,74 @@ func TestInsertAndDelete(t *testing.T) {
 			fmt.Println("Iter", i)
 		}
 	}
+	tree.checkBalance(inc(t), t)
 	tree.Traverse(inc(t))
 
 	//tree.Print()
-	fmt.Printf("%+v", tree.Height)
+	fmt.Printf("Height: %+v\n", tree.Height)
+	fmt.Printf("Size %+v\n", tree.Size)
+	fmt.Printf("Space %+v\n", tree.Space("KiB"))
 
 	//tree.Print()
 	//fmt.Printf("%+v", tree)
+}
+
+func (t *AvlTree) checkBalance(f IterFunc, t2 *testing.T) {
+
+	var node *avlNode = t.first
+	if t.root == nil {
+		return
+	}
+	skew := make(map[int]int)
+	for {
+		f(node.key, node.item)
+		switch node.balance {
+		case -1, 1, 0:
+		default:
+			skew[node.balance]++
+		}
+		if node == t.last {
+			if len(skew) != 0 {
+				t2.Errorf("Should not have any weird balances")
+			}
+			break
+		}
+		node = node.Next()
+	}
+}
+
+func BenchmarkInsert(b *testing.B) {
+
+	b.StopTimer()
+	r := rand.New(rand.NewSource(int64(5)))
+	tree := New(testCmp)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		old, ok := tree.Insert(r.Int(), r.Int())
+		if !ok {
+			_ = old
+		}
+	}
+
+}
+
+func BenchmarkDelete(b *testing.B) {
+
+	b.StopTimer()
+	r := rand.New(rand.NewSource(int64(5)))
+	tree := New(testCmp)
+	for i := 0; i < b.N; i++ {
+		old, ok := tree.Insert(r.Int(), r.Int())
+		if !ok {
+			_ = old
+		}
+	}
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		old, ok := tree.Remove(r.Int())
+		if !ok {
+			_ = old
+		}
+	}
 }

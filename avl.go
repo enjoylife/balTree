@@ -3,6 +3,7 @@ package gotree
 import (
 	"fmt"
 	"sync"
+	"unsafe" // for sizeof
 )
 
 type avlNode struct {
@@ -12,22 +13,37 @@ type avlNode struct {
 	balance             int
 }
 
-type cmpFunc func(interface{}, interface{}) int
-type trvFunc func(interface{}, interface{})
-
-type AvlTree struct {
-	root, first, last *avlNode
-	Height            int
-	cmp               cmpFunc
-	lock              sync.RWMutex
-	Size              int
+func (n *avlNode) Next() *avlNode {
+	var p *avlNode
+	if n.right != nil {
+		return n.right.minChild()
+	}
+	p = n.parent
+	for p != nil && p.right == n {
+		n = p
+		p = n.parent
+	}
+	return p
 }
 
-func New(cmp cmpFunc) *AvlTree {
-	if cmp == nil {
-		panic("Must define a compare function")
+func (n *avlNode) Prev() *avlNode {
+	var p *avlNode
+	if n.left != nil {
+		return n.left.maxChild()
 	}
-	return &AvlTree{root: nil, first: nil, last: nil, cmp: cmp}
+	p = n.parent
+	for p != nil && p.right == n {
+		n = p
+		p = n.parent
+	}
+	return p
+}
+func (n *avlNode) Key() interface{} {
+	return n.key
+}
+
+func (n *avlNode) Value() interface{} {
+	return n.item
 }
 
 func (n *avlNode) minChild() *avlNode {
@@ -45,30 +61,21 @@ func (n *avlNode) maxChild() *avlNode {
 	return n
 }
 
-func (n *avlNode) next() *avlNode {
-	var p *avlNode
-	if n.right != nil {
-		return n.right.minChild()
-	}
-	p = n.parent
-	for p != nil && p.right == n {
-		n = p
-		p = n.parent
-	}
-	return p
+type AvlTree struct {
+	Height int
+	Size   int
+
+	root, first, last *avlNode
+
+	cmp  CompareFunc
+	lock sync.RWMutex
 }
 
-func (n *avlNode) prev() *avlNode {
-	var p *avlNode
-	if n.left != nil {
-		return n.left.maxChild()
+func New(cmp CompareFunc) *AvlTree {
+	if cmp == nil {
+		panic("Must define a compare function")
 	}
-	p = n.parent
-	for p != nil && p.right == n {
-		n = p
-		p = n.parent
-	}
-	return p
+	return &AvlTree{root: nil, first: nil, last: nil, cmp: cmp}
 }
 
 func (t *AvlTree) First() (interface{}, bool) {
@@ -91,7 +98,7 @@ func (t *AvlTree) rotateLeft(n *avlNode) {
 		q      = n.right
 		parent = p.parent
 	)
-	if p != t.root {
+	if p.parent != nil {
 		if parent.left == p {
 			parent.left = q
 		} else {
@@ -115,7 +122,7 @@ func (t *AvlTree) rotateRight(n *avlNode) {
 		q      = n.left
 		parent = p.parent
 	)
-	if p != t.root {
+	if p.parent != nil {
 		if parent.left == p {
 			parent.left = q
 		} else {
@@ -132,6 +139,26 @@ func (t *AvlTree) rotateRight(n *avlNode) {
 	}
 	q.right = p
 
+}
+
+func (t *AvlTree) Space(format string) float64 {
+
+	const prior = unsafe.Sizeof(*t)
+	const nodeSize = unsafe.Sizeof(t.root)
+	bytes := float64(prior + nodeSize*uintptr(t.Size))
+	switch format {
+	case "KiB":
+		return bytes / (2 << 9)
+	case "kB":
+		return bytes / 1000
+	case "MiB":
+		return bytes / (2 << 19)
+	case "MB":
+		return bytes / 1000000
+	default:
+		return -1.0
+	}
+	return 0
 }
 
 func (t *AvlTree) Search(key interface{}) (item interface{}, ok bool) {
@@ -153,7 +180,11 @@ func (t *AvlTree) Search(key interface{}) (item interface{}, ok bool) {
 	return nil, false
 }
 
-func (t *AvlTree) Insert(key interface{}, item interface{}) (old interface{}) {
+func (t *AvlTree) Insert(key interface{}, item interface{}) (old interface{}, ok bool) {
+	if key == nil {
+		ok = false
+		return
+	}
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -183,22 +214,35 @@ func (t *AvlTree) Insert(key interface{}, item interface{}) (old interface{}) {
 		}
 
 	}
-
-	node = &avlNode{
-		key: key, item: item,
-		parent: nil, left: nil, right: nil,
-		balance: 0,
+	// add if only a new insertion
+	if old == nil {
+		t.Size++
+		node = &avlNode{
+			key: key, item: item,
+			parent: parent, left: nil, right: nil,
+			balance: 0,
+		}
+	} else {
+		node.item = item
+		return
 	}
 
-	t.Size++
-
+	// base case
 	if parent == nil {
 		t.root = node
 		t.first = node
 		t.last = node
 		t.Height++
-		return old
+		return old, true
 	}
+
+	// link to tree
+	if isLeft {
+		parent.left = node
+	} else {
+		parent.right = node
+	}
+
 	// Maintain first and last pointers
 	if isLeft {
 		if parent == t.first {
@@ -210,19 +254,15 @@ func (t *AvlTree) Insert(key interface{}, item interface{}) (old interface{}) {
 		}
 	}
 
-	// Maintin node pointers
-	node.parent = parent
-	if isLeft {
-		parent.left = node
-	} else {
-		parent.right = node
-	}
-
+	// fix balances on our way up to unbalanced node
 	for {
-		if parent.left == node {
+		switch node {
+		case parent.left:
 			parent.balance--
-		} else {
+		case parent.right:
 			parent.balance++
+		default:
+			panic("SHOULDNT")
 		}
 		if parent == unbalanced {
 			break
@@ -240,8 +280,11 @@ func (t *AvlTree) Insert(key interface{}, item interface{}) (old interface{}) {
 		if right.balance == 1 {
 			unbalanced.balance = 0
 			right.balance = 0
-		} else if right.left == nil {
+			//	} else if right.left == nil {
 		} else {
+			if right.left == nil {
+				panic("WE GOT A NIL")
+			}
 			switch right.left.balance {
 			case 1:
 				unbalanced.balance = -1
@@ -264,16 +307,19 @@ func (t *AvlTree) Insert(key interface{}, item interface{}) (old interface{}) {
 			left.balance = 0
 		} else if left.right == nil {
 		} else {
+			if left.right == nil {
+				panic("WE GOT A NIL")
+			}
 			switch left.right.balance {
 			case 1:
-				unbalanced.balance = -1
-				left.balance = 0
+				unbalanced.balance = 0
+				left.balance = -1
 			case 0:
 				unbalanced.balance = 0
 				left.balance = 0
 			case -1:
-				unbalanced.balance = 0
-				left.balance = 1
+				unbalanced.balance = 1
+				left.balance = 0
 			}
 			left.right.balance = 0
 			t.rotateLeft(left)
@@ -281,9 +327,10 @@ func (t *AvlTree) Insert(key interface{}, item interface{}) (old interface{}) {
 		t.rotateRight(unbalanced)
 
 	default:
+		fmt.Println(unbalanced.balance)
 	}
 
-	return old
+	return old, true
 }
 
 func (t *AvlTree) Remove(key interface{}) (old interface{}, ok bool) {
@@ -325,10 +372,10 @@ func (t *AvlTree) Remove(key interface{}) (old interface{}, ok bool) {
 		next  *avlNode
 	)
 	if node == t.first {
-		t.first = node.next()
+		t.first = node.Next()
 	}
 	if node == t.last {
-		t.last = node.prev()
+		t.last = node.Prev()
 	}
 
 	if left == nil {
@@ -460,24 +507,17 @@ func (t *AvlTree) Remove(key interface{}) (old interface{}, ok bool) {
 	return old, true
 }
 
-func (t *AvlTree) Traverse(f trvFunc) {
+func (t *AvlTree) Traverse(f IterFunc) {
 	var node *avlNode = t.first
 	if t.root == nil {
 		return
 	}
-	skew := make(map[int]int)
 	for {
 		f(node.key, node.item)
-		switch node.balance {
-		case -1, 1, 0:
-		default:
-			skew[node.balance]++
-		}
 		if node == t.last {
-			fmt.Print("%+v", skew)
 			break
 		}
-		node = node.next()
+		node = node.Next()
 	}
 }
 
@@ -492,6 +532,6 @@ func (t *AvlTree) Print() {
 		if node == t.last {
 			break
 		}
-		node = node.next()
+		node = node.Next()
 	}
 }
