@@ -122,16 +122,22 @@ func (t *RbTree) Search(key interface{}) (value interface{}, ok bool) {
 func (t *RbTree) Insert(key interface{}, value interface{}) (old interface{}, ok bool) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	t.root = t.insert(t.root, key, value)
+	//t.root = t.insert(t.root, key, value)
+	t.root = t.insertIter(t.root, key, value)
+	if t.root.color == Red {
+		t.Height++
+	}
 	t.root.color = Black
 	return
 }
 
 func (t *RbTree) insert(h *rbNode, key interface{}, value interface{}) *rbNode {
 
+	// empty tree
 	if h == nil {
 		return &rbNode{color: Red, key: key, value: value}
 	}
+
 	switch cmp := t.cmp(h.key, key); {
 	case cmp == 0:
 		h.value = value
@@ -140,6 +146,7 @@ func (t *RbTree) insert(h *rbNode, key interface{}, value interface{}) *rbNode {
 	default:
 		h.right = t.insert(h.right, key, value)
 	}
+
 	if h.right.isRed() && !(h.left.isRed()) {
 		h = h.rotateLeft()
 	}
@@ -153,78 +160,45 @@ func (t *RbTree) insert(h *rbNode, key interface{}, value interface{}) *rbNode {
 	return h
 }
 
-func (t *RbTree) InsertIter(key interface{}, value interface{}) (old interface{}, ok bool) {
+func (t *RbTree) insertIter(h *rbNode, key interface{}, value interface{}) *rbNode {
 
-	if key == nil {
-		ok = false
-		return
-	}
-	t.lock.Lock() // for writing
-	defer t.lock.Unlock()
-	h := t.root
-	type path struct {
-		node *rbNode
-		dir  bool
-	}
-	stack := []path{}
-	for h != nil {
-		if h.left.isRed() && h.right.isRed() {
-			h.colorFlip()
-		}
-		cmp := t.cmp(h.key, key)
-		if cmp == 0 {
-			//fmt.Println("Old value")
-			old = h.value
-			h.value = value
-			ok = true
+	stack := []*rbNode{}
+	count := 0
+	for {
+		// empty tree
+		if h == nil {
+			h = &rbNode{color: Red, key: key, value: value}
+			stack = append(stack, h)
+			count++
 			break
-
-		} else if cmp > 0 {
-			stack = append(stack, path{h, Left})
-			//fmt.Println("Going left")
+		}
+		stack = append(stack, h)
+		count++
+		switch cmp := t.cmp(h.key, key); {
+		case cmp == 0:
+			h.value = value
+			break
+		case cmp > 0:
 			h = h.left
-		} else {
-			stack = append(stack, path{h, Right})
-			fmt.Println("Going right")
+		default:
 			h = h.right
 		}
 	}
-	//fmt.Printf("Stack: %v\n", stack)
-	if h == nil {
-		h = &rbNode{color: Red, key: key, value: value, left: nil, right: nil}
-		//stack = append(stack, h)
-	} else {
-		fmt.Println("Have old")
-	}
-
-	stackHeight := len(stack) - 1
-	//fmt.Println("Height", stackHeight)
-	for i := stackHeight; i >= 0; i-- {
-		//fmt.Println("Iter", i, "value", h.value)
-		parent := stack[i]
-		if h == nil || parent.node == nil {
-			s := fmt.Sprintf("I: %d", i)
-			panic(s)
-		}
-		if h.right.isRed() && !h.left.isRed() {
-			//fmt.Println("Rotate Left")
+	for count > 0 {
+		count--
+		h = stack[count]
+		if h.right.isRed() && !(h.left.isRed()) {
 			h = h.rotateLeft()
 		}
 		if h.left.isRed() && h.left.left.isRed() {
-			//fmt.Println("Rotate Right")
 			h = h.rotateRight()
 		}
-		if parent.dir == Left {
-			parent.node.left = h
-		} else {
-			parent.node.right = h
-		}
-		h = parent.node
-	}
-	t.root = h
-	t.root.color = Black
 
-	return
+		if h.left.isRed() && h.right.isRed() {
+			h.colorFlip()
+		}
+	}
+	return h
 }
 
 func (h *rbNode) isRed() bool {

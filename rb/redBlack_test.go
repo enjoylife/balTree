@@ -25,35 +25,22 @@ func inc(t *testing.T) func(key interface{}, value interface{}) {
 	}
 }
 
-//func TestInsert(t *testing.T) {
-func testInsert(t *testing.T) {
+func TestInsert(t *testing.T) {
 
 	r := rand.New(rand.NewSource(int64(5)))
 	tree := New(testCmp)
-	tree2 := New(testCmp)
-	iters := 4
+	iters := 10
 	for i := 0; i < iters; i++ {
 		item := r.Int()
 		item = i
 		//fmt.Printf("Iteration %d\n", i)
 		tree.Insert(item, item)
-		tree2.InsertIter(item, item)
 	}
 	order := tree.TraverseTest(inc(t))
-	order2 := tree2.TraverseTest(inc(t))
-	fmt.Printf("Len: %d Len2: %d\n", len(order), len(order2))
-	if len(order) != len(order2) {
-		t.Errorf("Unequal")
-	}
+	fmt.Printf("Len: %d \n", len(order))
 	for i := 0; i < len(order); i++ {
-		if order[i] != nil && order2[i] != nil {
-			a := order[i].value.(int)
-			b := order2[i].value.(int)
-
-			if int(a) != int(b) {
-				//t.Errorf("A: %d B: %d", a, b)
-				t.Logf("A: %d B: %d", a, b)
-			}
+		if order[i] != nil {
+			//a := order[i].value.(int)
 		}
 	}
 }
