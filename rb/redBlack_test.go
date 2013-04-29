@@ -89,5 +89,6 @@ func BenchmarkInsert(b *testing.B) {
 			_ = old
 		}
 	}
+	fmt.Println("Height", tree.Height)
 
 }

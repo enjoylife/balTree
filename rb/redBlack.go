@@ -122,8 +122,13 @@ func (t *RbTree) Search(key interface{}) (value interface{}, ok bool) {
 func (t *RbTree) Insert(key interface{}, value interface{}) (old interface{}, ok bool) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	//t.root = t.insert(t.root, key, value)
-	t.root = t.insertIter(t.root, key, value)
+
+	if t.root == nil {
+		t.root = &rbNode{color: Red, key: key, value: value}
+	} else {
+		//t.root = t.insert(t.root, key, value)
+		t.root = t.insertIter(t.root, key, value)
+	}
 	if t.root.color == Red {
 		t.Height++
 	}
@@ -167,7 +172,7 @@ func (t *RbTree) insertIter(h *rbNode, key interface{}, value interface{}) *rbNo
 	for {
 		// empty tree
 		if h == nil {
-			h = &rbNode{color: Red, key: key, value: value}
+			h = &rbNode{color: Red, key: key, value: value, left: nil, right: nil}
 			stack = append(stack, h)
 			count++
 			break
@@ -177,6 +182,7 @@ func (t *RbTree) insertIter(h *rbNode, key interface{}, value interface{}) *rbNo
 		switch cmp := t.cmp(h.key, key); {
 		case cmp == 0:
 			h.value = value
+			fmt.Println("Jumping Out")
 			break
 		case cmp > 0:
 			h = h.left
@@ -184,6 +190,7 @@ func (t *RbTree) insertIter(h *rbNode, key interface{}, value interface{}) *rbNo
 			h = h.right
 		}
 	}
+	fmt.Println(stack)
 	for count > 0 {
 		count--
 		h = stack[count]
