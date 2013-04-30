@@ -2,24 +2,21 @@ package gorbtree
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"gotree"
 	"sync"
 )
 
-var _ = fmt.Println
+type color bool
 
 const (
-	Red   = true
-	Black = false
-	Left  = true
-	Right = false
+	Red   color = true
+	Black color = false
 )
 
 type rbNode struct {
 	left, right *rbNode
 	key, value  interface{}
-	color       bool
+	color       color
 }
 
 type RbTree struct {
@@ -54,24 +51,54 @@ func (n *rbNode) MaxChild() *rbNode {
 	return n
 }
 
-// Cant modify the tree as we go down
-// for if the stack gets out of sync as we head
-// back up it will be all bad
+func (t *RbTree) Traverse(order gotree.TravOrder, f gotree.IterFunc) {
 
-func (t *RbTree) Traverse(f gotree.IterFunc) {
+	n := t.root
+	switch order {
+	case gotree.InOrder:
+		var inorder func(node *rbNode)
+		inorder = func(node *rbNode) {
+			if node == nil {
+				return
+			}
+			inorder(node.left)
+			f(node.key, node.value)
+			inorder(node.right)
+		}
+		inorder(n)
+	case gotree.PreOrder:
+		var preorder func(node *rbNode)
+		preorder = func(node *rbNode) {
+			if node == nil {
+				return
+			}
+			f(node.key, node.value)
+			preorder(node.left)
+			preorder(node.right)
+		}
+
+		preorder(n)
+
+	default:
+		s := fmt.Sprintf("rbTree has Not Implemented %s.", order)
+		panic(s)
+	}
+
+}
+
+func (t *RbTree) TraverseIter(f gotree.IterFunc) {
 	node := t.root
 	stack := []*rbNode{nil}
 	for len(stack) != 1 || node != nil {
 		if node != nil {
 			stack = append(stack, node)
-			node = node.right
+			node = node.left
 		} else {
 			stackIndex := len(stack) - 1
 			node = stack[stackIndex]
 			f(node.key, node.value)
 			stack = stack[0:stackIndex]
-			//fmt.Println("stack size", len(stack))
-			node = node.left
+			node = node.right
 		}
 	}
 }
@@ -128,7 +155,7 @@ func (t *RbTree) Insert(key interface{}, value interface{}) (old interface{}, ok
 	if t.root == nil {
 		t.root = &rbNode{color: Red, key: key, value: value, left: nil, right: nil}
 	} else {
-		//t.root = t.insert(t.root, key, value)
+		//	t.root = t.insert(t.root, key, value)
 		t.root = t.insertIter(t.root, key, value)
 	}
 	if t.root.color == Red {
@@ -176,77 +203,48 @@ func (t *RbTree) insertIter(h *rbNode, key interface{}, value interface{}) *rbNo
 		return &rbNode{color: Red, key: key, value: value}
 	}
 
-	// we need to store which way we took on the way down,
-	// so we can reconnect nodes parents
-	type path struct {
-		node *rbNode
-		dir  gotree.Direction
-	}
-
 	// setup our own stack and helpers
 	var (
-		stack        = []path{}
-		count    int = 0
-		whichWay gotree.Direction
-		prior    *rbNode
+		stack     = []*rbNode{}
+		count int = 0
+		prior *rbNode
 	)
 
 L:
 	for {
-		if h == nil {
-			panic("FOUND NULL AT START")
-		}
-		fmt.Printf("Node %d, Key %d\n", h.key, key)
-		fmt.Println("Count", count)
 		switch t.cmp(h.key, key) {
 		case gotree.EQ:
 			h.value = value
-			fmt.Println("RETURN ROOT EQUAL")
 			return t.root // no need for rest of the fix code
 		case gotree.LT:
-			whichWay = gotree.LT
 			prior = h
-			stack = append(stack, path{node: prior, dir: whichWay})
+			stack = append(stack, prior)
 			count++
 			h = h.left
-			if prior == h {
-				panic("Shouldn't be equal")
+			if h == nil {
+				h = &rbNode{color: Red, key: key, value: value}
+				prior.left = h
+				break L
 			}
 		case gotree.GT:
-			whichWay = gotree.GT
 			prior = h
-			stack = append(stack, path{node: prior, dir: whichWay})
+			stack = append(stack, prior)
 			count++
 			h = h.right
-			if prior == h {
-				panic("Shouldn't be equal")
+			if h == nil {
+				h = &rbNode{color: Red, key: key, value: value}
+				prior.right = h
+				break L
 			}
 		default:
 			panic("Compare result undefined")
 		}
 
-		// we found our spot to insert, create our node and linke to parent
-		if h == nil {
-			h = &rbNode{color: Red, key: key, value: value, left: nil, right: nil}
-			switch whichWay {
-			case gotree.LT:
-				prior.left = h
-			case gotree.GT:
-				prior.right = h
-			default:
-				panic("Unknown direction")
-			}
-			fmt.Println("LEAVING NIL")
-			break L
-		}
 		if prior == h {
 			panic("Shouldn't be equal last check")
 		}
 
 	}
-
-	fmt.Println("Before Fix")
-	spew.Dump(t.root)
 
 	// h is parent of new node at this point
 	h = prior
@@ -263,29 +261,24 @@ L2:
 		if h.left.isRed() && h.right.isRed() {
 			h.colorFlip()
 		}
-		if prior == nil {
-			panic("WE GOT A NIL")
-		}
 
 		if count == 0 {
 			break L2
 		}
 
 		if count > 0 {
-			switch stack[count-1].dir {
+
+			switch t.cmp(stack[count-1].key, h.key) {
 			case gotree.LT:
-				stack[count-1].node.left = h
+				stack[count-1].left = h
 			case gotree.GT:
-				stack[count-1].node.right = h
+				stack[count-1].right = h
 			}
-			h = stack[count-1].node
+			h = stack[count-1]
 		}
 
 	}
 
-	fmt.Println("After Fix")
-	spew.Dump(t.root)
-	fmt.Println("DONE")
 	return h
 }
 
