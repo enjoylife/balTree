@@ -1,8 +1,9 @@
 package gorbtree
 
 import (
-	"../"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"gotree"
 	"sync"
 )
 
@@ -56,20 +57,21 @@ func (n *rbNode) MaxChild() *rbNode {
 // Cant modify the tree as we go down
 // for if the stack gets out of sync as we head
 // back up it will be all bad
+
 func (t *RbTree) Traverse(f gotree.IterFunc) {
 	node := t.root
 	stack := []*rbNode{nil}
 	for len(stack) != 1 || node != nil {
 		if node != nil {
 			stack = append(stack, node)
-			node = node.left
+			node = node.right
 		} else {
 			stackIndex := len(stack) - 1
 			node = stack[stackIndex]
 			f(node.key, node.value)
 			stack = stack[0:stackIndex]
 			//fmt.Println("stack size", len(stack))
-			node = node.right
+			node = node.left
 		}
 	}
 }
@@ -124,7 +126,7 @@ func (t *RbTree) Insert(key interface{}, value interface{}) (old interface{}, ok
 	defer t.lock.Unlock()
 
 	if t.root == nil {
-		t.root = &rbNode{color: Red, key: key, value: value}
+		t.root = &rbNode{color: Red, key: key, value: value, left: nil, right: nil}
 	} else {
 		//t.root = t.insert(t.root, key, value)
 		t.root = t.insertIter(t.root, key, value)
@@ -143,13 +145,15 @@ func (t *RbTree) insert(h *rbNode, key interface{}, value interface{}) *rbNode {
 		return &rbNode{color: Red, key: key, value: value}
 	}
 
-	switch cmp := t.cmp(h.key, key); {
-	case cmp == 0:
+	switch t.cmp(h.key, key) {
+	case gotree.EQ:
 		h.value = value
-	case cmp > 0:
+	case gotree.LT:
 		h.left = t.insert(h.left, key, value)
-	default:
+	case gotree.GT:
 		h.right = t.insert(h.right, key, value)
+	default:
+		panic("Compare result of undefined")
 	}
 
 	if h.right.isRed() && !(h.left.isRed()) {
@@ -167,44 +171,121 @@ func (t *RbTree) insert(h *rbNode, key interface{}, value interface{}) *rbNode {
 
 func (t *RbTree) insertIter(h *rbNode, key interface{}, value interface{}) *rbNode {
 
-	stack := []*rbNode{}
-	count := 0
+	// empty tree
+	if h == nil {
+		return &rbNode{color: Red, key: key, value: value}
+	}
+
+	// we need to store which way we took on the way down,
+	// so we can reconnect nodes parents
+	type path struct {
+		node *rbNode
+		dir  gotree.Direction
+	}
+
+	// setup our own stack and helpers
+	var (
+		stack        = []path{}
+		count    int = 0
+		whichWay gotree.Direction
+		prior    *rbNode
+	)
+
+L:
 	for {
-		// empty tree
+		if h == nil {
+			panic("FOUND NULL AT START")
+		}
+		fmt.Printf("Node %d, Key %d\n", h.key, key)
+		fmt.Println("Count", count)
+		switch t.cmp(h.key, key) {
+		case gotree.EQ:
+			h.value = value
+			fmt.Println("RETURN ROOT EQUAL")
+			return t.root // no need for rest of the fix code
+		case gotree.LT:
+			whichWay = gotree.LT
+			prior = h
+			stack = append(stack, path{node: prior, dir: whichWay})
+			count++
+			h = h.left
+			if prior == h {
+				panic("Shouldn't be equal")
+			}
+		case gotree.GT:
+			whichWay = gotree.GT
+			prior = h
+			stack = append(stack, path{node: prior, dir: whichWay})
+			count++
+			h = h.right
+			if prior == h {
+				panic("Shouldn't be equal")
+			}
+		default:
+			panic("Compare result undefined")
+		}
+
+		// we found our spot to insert, create our node and linke to parent
 		if h == nil {
 			h = &rbNode{color: Red, key: key, value: value, left: nil, right: nil}
-			stack = append(stack, h)
-			count++
-			break
+			switch whichWay {
+			case gotree.LT:
+				prior.left = h
+			case gotree.GT:
+				prior.right = h
+			default:
+				panic("Unknown direction")
+			}
+			fmt.Println("LEAVING NIL")
+			break L
 		}
-		stack = append(stack, h)
-		count++
-		switch cmp := t.cmp(h.key, key); {
-		case cmp == 0:
-			h.value = value
-			fmt.Println("Jumping Out")
-			break
-		case cmp > 0:
-			h = h.left
-		default:
-			h = h.right
+		if prior == h {
+			panic("Shouldn't be equal last check")
 		}
+
 	}
-	fmt.Println(stack)
-	for count > 0 {
+
+	fmt.Println("Before Fix")
+	spew.Dump(t.root)
+
+	// h is parent of new node at this point
+	h = prior
+L2:
+	for {
 		count--
-		h = stack[count]
+
 		if h.right.isRed() && !(h.left.isRed()) {
 			h = h.rotateLeft()
 		}
 		if h.left.isRed() && h.left.left.isRed() {
 			h = h.rotateRight()
 		}
-
 		if h.left.isRed() && h.right.isRed() {
 			h.colorFlip()
 		}
+		if prior == nil {
+			panic("WE GOT A NIL")
+		}
+
+		if count == 0 {
+			break L2
+		}
+
+		if count > 0 {
+			switch stack[count-1].dir {
+			case gotree.LT:
+				stack[count-1].node.left = h
+			case gotree.GT:
+				stack[count-1].node.right = h
+			}
+			h = stack[count-1].node
+		}
+
 	}
+
+	fmt.Println("After Fix")
+	spew.Dump(t.root)
+	fmt.Println("DONE")
 	return h
 }
 

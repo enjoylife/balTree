@@ -1,6 +1,14 @@
 package gotree
 
-type CompareFunc func(interface{}, interface{}) int
+type Direction int
+
+const (
+	GT Direction = 1
+	EQ Direction = 0
+	LT Direction = -1
+)
+
+type CompareFunc func(interface{}, interface{}) Direction
 type IterFunc func(interface{}, interface{})
 
 type Node interface {
