@@ -1,3 +1,15 @@
+/*
+Possible iteration ideas
+for e := someList.Front(); e != nil; e = e.Next() {
+    v := e.Value.(T)
+}
+
+for n := tree.InitIter(gotree.InOrder); n != nil; n = tree.Next() {
+
+    n.key ....
+    n.value ....
+}
+*/
 package gorbtree
 
 import (
@@ -18,11 +30,17 @@ type rbNode struct {
 	key, value  interface{}
 	color       color
 }
+type rbIter struct {
+	current *rbNode
+	stack   []*rbNode
+	next    func() *rbNode
+}
 
 type RbTree struct {
 	Height      int
 	Size        int
 	first, last *rbNode
+	iter        rbIter
 	root        *rbNode
 	cmp         gotree.CompareFunc
 	lock        sync.RWMutex
@@ -51,6 +69,55 @@ func (n *rbNode) MaxChild() *rbNode {
 	return n
 }
 
+/*
+iterativeInorder(node)
+  parentStack = empty stack
+  while not parentStack.isEmpty() or node != null
+    if node != null then
+      parentStack.push(node)
+      node = node.left
+    else
+      node = parentStack.pop()
+      visit(node)
+      node = node.right
+*/
+
+func (t *RbTree) Next() *rbNode {
+	return t.iter.next()
+}
+
+func (t *RbTree) InitIter(order gotree.TravOrder) *rbNode {
+	current := t.root
+	stack := []*rbNode{}
+	switch order {
+	case gotree.InOrder:
+		t.iter.next = func() (out *rbNode) {
+
+			if len(stack) > 0 || current != nil {
+				if current != nil {
+					stack = append(stack, current)
+					current = current.left
+				} else {
+					stackIndex := len(stack) - 1
+					out = stack[stackIndex]
+					stack = stack[0:stackIndex]
+					current = current.right
+				}
+				return out
+			} else {
+				return nil
+			}
+		}
+
+		//case gotree.PreOrder:
+		//case gotree.PostOrder:
+	default:
+		s := fmt.Sprintf("rbTree has not implemented %s for iteration.", order)
+		panic(s)
+	}
+	return t.root
+
+}
 func (t *RbTree) Traverse(order gotree.TravOrder, f gotree.IterFunc) {
 
 	n := t.root
@@ -80,7 +147,7 @@ func (t *RbTree) Traverse(order gotree.TravOrder, f gotree.IterFunc) {
 		preorder(n)
 
 	default:
-		s := fmt.Sprintf("rbTree has Not Implemented %s.", order)
+		s := fmt.Sprintf("rbTree has not implemented %s.", order)
 		panic(s)
 	}
 

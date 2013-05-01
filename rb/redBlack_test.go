@@ -23,10 +23,37 @@ func testCmp(a interface{}, b interface{}) gotree.Direction {
 	}
 }
 
+func testCmpString(c interface{}, d interface{}) gotree.Direction {
+	a := c.(string)
+	b := d.(string)
+	min := len(b)
+	if len(a) < len(b) {
+		min = len(a)
+	}
+	diff := 0
+	for i := 0; i < min && diff == 0; i++ {
+		diff = int(a[i]) - int(b[i])
+	}
+	if diff == 0 {
+		diff = len(a) - len(b)
+	}
+
+	switch result := diff; {
+	case result > 0:
+		return gotree.LT
+	case result < 0:
+		return gotree.GT
+	case result == 0:
+		return gotree.EQ
+	default:
+		panic("Invalid Compare function Result")
+	}
+}
+
 /* Helpers for tree traversal and testing tree properties */
 
 func printNode(key interface{}, value interface{}) {
-	fmt.Println("VALUE: ", value.(int))
+	fmt.Println("VALUE: ", value)
 }
 
 func isBalanced(t *RbTree) bool {
@@ -67,6 +94,11 @@ func inc(t *testing.T) func(key interface{}, value interface{}) {
 	}
 }
 
+/*func accumulate(t *testing.T,store, []string) func(key interface{}, value interface{}){
+    return func( key interface{}, value interface{}){
+    }
+}*/
+
 func TestInsert(t *testing.T) {
 
 	r := rand.New(rand.NewSource(int64(5)))
@@ -79,13 +111,7 @@ func TestInsert(t *testing.T) {
 	}
 	fmt.Println(isBalanced(tree))
 	fmt.Println(tree.Height)
-	order := tree.TraverseTest(inc(t))
-	fmt.Printf("Len: %d \n", len(order))
-	for i := 0; i < len(order); i++ {
-		//fmt.Println(order[i].value.(int))
-	}
-
-	var black int // number of black links on path from root to min
+	var black int
 	for x := tree.root; x != nil; x = x.left {
 		if x.color == Black {
 			black++
@@ -95,29 +121,19 @@ func TestInsert(t *testing.T) {
 		t.Errorf("Height is not correct got %d, should be", tree.Height, black)
 	}
 
-	tree.Traverse(gotree.PreOrder, printNode)
+	tree.Traverse(gotree.InOrder, inc(t))
 }
 
-func (t *RbTree) TraverseTest(f gotree.IterFunc) []*rbNode {
-	node := t.root
-	order := []*rbNode{nil}
-	stack := []*rbNode{nil}
-	for len(stack) != 1 || node != nil {
-		if node != nil {
-			stack = append(stack, node)
-			order = append(order, node)
-			node = node.left
-		} else {
-			stackIndex := len(stack) - 1
-			node = stack[stackIndex]
-			f(node.key, node.value)
-			stack = stack[0:stackIndex]
-			//fmt.Println("stack size", len(stack))
-			node = node.right
-		}
+func TestTraversal(t *testing.T) {
+	tree := New(testCmpString)
+	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
+	for _, v := range items {
+		tree.Insert(v, v)
 	}
-	return order
+	tree.Traverse(gotree.InOrder, printNode)
+
 }
+
 func BenchmarkMapInsert(b *testing.B) {
 
 	b.StopTimer()
