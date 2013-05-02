@@ -55,6 +55,7 @@ func (d Direction) String() string {
 
 /*
 Needed function to determine insertion order, and compare our stored types equality.
+We compare the First param to the second, so if first param is bigger then GT, if equal EQ, etc.
 
 EX:
     func testCmp(a interface{}, b interface{}) gotree.Direction {
@@ -82,12 +83,13 @@ EX:
 */
 type IterFunc func(interface{}, interface{})
 
-/*type Node interface {
+type Node interface {
 	//New(key interface{}, value interface{}, extra ...interface{})
-	Key interface{}
-	Value interface{}
+	Key() interface{}
+	Value() interface{}
 }
 
+/*
 type Tree interface {
 	Search(interface{}) (interface{}, bool)
 	Insert(interface{}, interface{}) (interface{}, bool)

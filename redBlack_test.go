@@ -1,9 +1,8 @@
-package gorbtree
+package gotree
 
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"gotree"
 	"math/rand"
 	"testing"
 )
@@ -13,21 +12,21 @@ var _ = spew.Dump
 var _ = fmt.Printf
 
 /* Testing Compare function: int */
-func testCmpInt(a interface{}, b interface{}) gotree.Direction {
+func testCmpInt(a interface{}, b interface{}) Direction {
 	switch result := (a.(int) - b.(int)); {
 	case result > 0:
-		return gotree.LT
+		return LT
 	case result < 0:
-		return gotree.GT
+		return GT
 	case result == 0:
-		return gotree.EQ
+		return EQ
 	default:
 		panic("Invalid Compare function Result")
 	}
 }
 
 /* Testing Compare function: string */
-func testCmpString(c interface{}, d interface{}) gotree.Direction {
+func testCmpString(c interface{}, d interface{}) Direction {
 	a := c.(string)
 	b := d.(string)
 	min := len(b)
@@ -44,11 +43,11 @@ func testCmpString(c interface{}, d interface{}) gotree.Direction {
 
 	switch result := diff; {
 	case result > 0:
-		return gotree.LT
+		return LT
 	case result < 0:
-		return gotree.GT
+		return GT
 	case result == 0:
-		return gotree.EQ
+		return EQ
 	default:
 		panic("Invalid Compare function Result")
 	}
@@ -109,7 +108,7 @@ func TestInsert(t *testing.T) {
 	if !isBalanced(tree) {
 		t.Errorf("Tree is not balanced")
 	}
-	tree.Traverse(gotree.InOrder, inc(t))
+	tree.Traverse(InOrder, inc(t))
 }
 
 func TestSearch(t *testing.T) {
@@ -124,7 +123,7 @@ func TestSearch(t *testing.T) {
 		t.Errorf("Not minding nil key's")
 	}
 
-	tree.Traverse(gotree.InOrder, inc(t))
+	tree.Traverse(InOrder, inc(t))
 	for i := 0; i < iters; i++ {
 		value, ok := tree.Search(i)
 		if !ok {
@@ -161,11 +160,11 @@ func TestIterIn(t *testing.T) {
 
 	count := 0
 
-	for i, n := 0, tree.InitIter(gotree.InOrder); n != nil; i, n = i+1, tree.Next() {
+	for i, n := 0, tree.InitIter(InOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if items[i] != n.Value {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, items[i])
+		if items[i] != n.Value() {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value(), items[i])
 		}
 
 	}
@@ -173,11 +172,11 @@ func TestIterIn(t *testing.T) {
 		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
 	}
 	count = 0
-	for i, n := 0, tree.InitIter(gotree.PreOrder); n != nil; i, n = i+1, tree.Next() {
+	for i, n := 0, tree.InitIter(PreOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if preOrder[i] != n.Value {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, preOrder[i])
+		if preOrder[i] != n.Value() {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value(), preOrder[i])
 		}
 
 	}
@@ -185,11 +184,11 @@ func TestIterIn(t *testing.T) {
 		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
 	}
 	count = 0
-	for i, n := 0, tree.InitIter(gotree.PostOrder); n != nil; i, n = i+1, tree.Next() {
+	for i, n := 0, tree.InitIter(PostOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if postOrder[i] != n.Value {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, postOrder[i])
+		if postOrder[i] != n.Value() {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value(), postOrder[i])
 		}
 
 	}
@@ -197,13 +196,14 @@ func TestIterIn(t *testing.T) {
 		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
 	}
 
-	//tree.Traverse(gotree.PreOrder, printNode)
+	//tree.Traverse(PreOrder, printNode)
 	//scs := spew.ConfigState{Indent: "\t"}
 	//scs.Dump(tree.root)
 
 }
 
 func TestTraversal(t *testing.T) {
+
 	tree := New(testCmpString)
 	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
 	for _, v := range items {
@@ -212,7 +212,7 @@ func TestTraversal(t *testing.T) {
 	if !isBalanced(tree) {
 		t.Errorf("Tree is not balanced")
 	}
-	//tree.Traverse(gotree.InOrder, printNode)
+	//tree.Traverse(InOrder, printNode)
 
 }
 
@@ -238,4 +238,107 @@ func BenchmarkInsert(b *testing.B) {
 		tree.Insert(r.Int(), r.Int())
 	}
 
+}
+
+/* Experiments: not used */
+func (t *RbTree) insertIter(h *rbNode, key interface{}, value interface{}) *rbNode {
+
+	// empty tree
+	if h == nil {
+		return &rbNode{color: Red, key: key, value: value}
+	}
+
+	// setup our own stack and helpers
+	var (
+		stack     = []*rbNode{}
+		count int = 0
+		prior *rbNode
+	)
+
+L:
+	for {
+		switch t.cmp(h.Key, key) {
+		case EQ:
+			h.value = value
+			return t.root // no need for rest of the fix code
+		case LT:
+			prior = h
+			stack = append(stack, prior)
+			count++
+			h = h.left
+			if h == nil {
+				h = &rbNode{color: Red, key: key, value: value}
+				prior.left = h
+				break L
+			}
+		case GT:
+			prior = h
+			stack = append(stack, prior)
+			count++
+			h = h.right
+			if h == nil {
+				h = &rbNode{color: Red, key: key, value: value}
+				prior.right = h
+				break L
+			}
+		default:
+			panic("Compare result undefined")
+		}
+
+		if prior == h {
+			panic("Shouldn't be equal last check")
+		}
+
+	}
+
+	// h is parent of new node at this point
+	h = prior
+L2:
+	for {
+		count--
+
+		if h.right.isRed() && !(h.left.isRed()) {
+			h = h.rotateLeft()
+		}
+		if h.left.isRed() && h.left.left.isRed() {
+			h = h.rotateRight()
+		}
+		if h.left.isRed() && h.right.isRed() {
+			h.colorFlip()
+		}
+
+		if count == 0 {
+			break L2
+		}
+
+		if count > 0 {
+
+			switch t.cmp(stack[count-1].Key, h.Key) {
+			case LT:
+				stack[count-1].left = h
+			case GT:
+				stack[count-1].right = h
+			}
+			h = stack[count-1]
+		}
+
+	}
+
+	return h
+}
+func (t *RbTree) TraverseIter(f IterFunc) {
+	node := t.root
+	stack := []*rbNode{nil}
+	for len(stack) != 1 || node != nil {
+		if node != nil {
+			stack = append(stack, node)
+			node = node.left
+		} else {
+			stackIndex := len(stack) - 1
+			node = stack[stackIndex]
+			f(node.Key, node.value)
+			stack = stack[0:stackIndex]
+			node = node.right
+		}
+	}
 }
