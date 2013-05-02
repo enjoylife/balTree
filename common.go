@@ -82,15 +82,10 @@ EX:
 */
 type IterFunc func(interface{}, interface{})
 
-type Node interface {
+/*type Node interface {
 	//New(key interface{}, value interface{}, extra ...interface{})
-	Key() interface{}
-	Value() interface{}
-	/*
-		    MinChild() *Node
-			MaxChild() *Node
-			Children() []*Node
-	*/
+	Key interface{}
+	Value interface{}
 }
 
 type Tree interface {
@@ -100,4 +95,4 @@ type Tree interface {
 	Next() *Node
 	Prev() *Node
 	Traverse(IterFunc)
-}
+}*/

@@ -104,7 +104,6 @@ func TestInsert(t *testing.T) {
 	iters := 10000
 	for i := 0; i < iters; i++ {
 		item := r.Int()
-		item = i
 		tree.Insert(item, item)
 	}
 	if !isBalanced(tree) {
@@ -113,10 +112,46 @@ func TestInsert(t *testing.T) {
 	tree.Traverse(gotree.InOrder, inc(t))
 }
 
+func TestSearch(t *testing.T) {
+
+	tree := New(testCmpInt)
+	iters := 10000
+	for i := 0; i < iters; i++ {
+		tree.Insert(i, i)
+	}
+	_, ok := tree.Search(nil)
+	if ok {
+		t.Errorf("Not minding nil key's")
+	}
+
+	tree.Traverse(gotree.InOrder, inc(t))
+	for i := 0; i < iters; i++ {
+		value, ok := tree.Search(i)
+		if !ok {
+			t.Errorf("All these values should be present")
+		}
+		if value != i {
+			t.Errorf("Values don't match Exp: %d, Got: %d", i, value)
+		}
+	}
+
+	for i := iters; i < iters*2; i++ {
+		value, ok := tree.Search(i)
+		if ok {
+			t.Errorf("values should not be present")
+		}
+		if value != nil {
+			t.Errorf("Values don't match Exp: %d, Got: %d", i, value)
+		}
+	}
+}
+
 func TestIterIn(t *testing.T) {
 
 	tree := New(testCmpInt)
 	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
+	preOrder := []string{"d", "b", "a", "c", "h", "f", "e", "g", "i"}
+	postOrder := []string{"a", "c", "b", "e", "g", "f", "i", "h", "d"}
 	for i, v := range items {
 		tree.Insert(i, v)
 	}
@@ -125,79 +160,46 @@ func TestIterIn(t *testing.T) {
 	}
 
 	count := 0
+
 	for i, n := 0, tree.InitIter(gotree.InOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if items[i] != n.value {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.value, items[i])
+		if items[i] != n.Value {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, items[i])
 		}
 
 	}
 	if count != len(items) {
 		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
 	}
-
-}
-
-func TestIterPre(t *testing.T) {
-
-	tree := New(testCmpInt)
-	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
-	//F, B, A, D, C, E, G, I, H
-	order := []string{"d", "b", "a", "c", "h", "f", "e", "g", "i"}
-	for i, v := range items {
-		tree.Insert(i, v)
-	}
-	if !isBalanced(tree) {
-		t.Errorf("Tree is not balanced")
-	}
-	//tree.Traverse(gotree.PreOrder, printNode)
-	//scs := spew.ConfigState{Indent: "\t"}
-	//scs.Dump(tree.root)
-
-	count := 0
+	count = 0
 	for i, n := 0, tree.InitIter(gotree.PreOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if order[i] != n.value {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.value, order[i])
+		if preOrder[i] != n.Value {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, preOrder[i])
 		}
 
 	}
-
 	if count != len(items) {
 		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
 	}
-
-}
-
-func TestIterPost(t *testing.T) {
-
-	tree := New(testCmpInt)
-	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
-	//F, B, A, D, C, E, G, I, H
-	order := []string{"a", "c", "b", "e", "g", "f", "i", "h", "d"}
-	for i, v := range items {
-		tree.Insert(i, v)
-	}
-	if !isBalanced(tree) {
-		t.Errorf("Tree is not balanced")
-	}
-	//tree.Traverse(gotree.PostOrder, printNode)
-
-	count := 0
+	count = 0
 	for i, n := 0, tree.InitIter(gotree.PostOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if order[i] != n.value {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.value, order[i])
+		if postOrder[i] != n.Value {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, postOrder[i])
 		}
 
 	}
-
 	if count != len(items) {
 		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
 	}
+
+	//tree.Traverse(gotree.PreOrder, printNode)
+	//scs := spew.ConfigState{Indent: "\t"}
+	//scs.Dump(tree.root)
 
 }
 

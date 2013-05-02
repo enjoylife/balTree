@@ -1,15 +1,3 @@
-/*
-Possible iteration ideas
-for e := someList.Front(); e != nil; e = e.Next() {
-    v := e.Value.(T)
-}
-
-for n := tree.InitIter(gotree.InOrder); n != nil; n = tree.Next() {
-
-    n.key ....
-    n.value ....
-}
-*/
 package gorbtree
 
 import (
@@ -25,11 +13,23 @@ const (
 	Black color = false
 )
 
+func (c color) String() string {
+	var s string
+	switch c {
+	case Red:
+		s = "red"
+	case Black:
+		s = "black"
+	}
+	return s
+}
+
 type rbNode struct {
 	left, right *rbNode
-	key, value  interface{}
+	Key, Value  interface{}
 	color       color
 }
+
 type rbIter struct {
 	current *rbNode
 	stack   []*rbNode
@@ -46,45 +46,33 @@ type RbTree struct {
 	lock        sync.RWMutex
 }
 
-func (n *rbNode) Key() interface{} {
-	return n.key
-}
-
-func (n *rbNode) Value() interface{} {
-	return n.value
-}
-
-func (n *rbNode) MinChild() *rbNode {
-	for n.left != nil {
-		n = n.left
+func New(cmp gotree.CompareFunc) *RbTree {
+	if cmp == nil {
+		panic("Must define a compare function")
 	}
-	return n
-
+	return &RbTree{root: nil, first: nil, last: nil, cmp: cmp}
 }
-
-func (n *rbNode) MaxChild() *rbNode {
-	for n.right != nil {
-		n = n.right
-	}
-	return n
-}
-
-/*
-iterativeInorder(node)
-  parentStack = empty stack
-  while not parentStack.isEmpty() or node != null
-    if node != null then
-      parentStack.push(node)
-      node = node.left
-    else
-      node = parentStack.pop()
-      visit(node)
-      node = node.right
-
-*/
 
 func (t *RbTree) Next() *rbNode {
 	return t.iter.next()
+}
+
+func (t *RbTree) Min() (key interface{}, value interface{}) {
+	n := t.root
+	for n.left != nil {
+		n = n.left
+	}
+	return n.Key, n.Value
+
+}
+
+func (t *RbTree) Max() (key interface{}, value interface{}) {
+	n := t.root
+	for n.right != nil {
+		n = n.right
+	}
+	return n.Key, n.Value
+
 }
 
 func (t *RbTree) InitIter(order gotree.TravOrder) *rbNode {
@@ -110,16 +98,6 @@ func (t *RbTree) InitIter(order gotree.TravOrder) *rbNode {
 			return out
 		}
 
-		/*iterativePreorder(node)
-		  parentStack = empty stack
-		  while not parentStack.isEmpty() or node != null
-		    if node != null then
-		      visit(node)
-		      parentStack.push(node.right)
-		      node = node.left
-		    else
-		      node = parentStack.pop()
-		*/
 	case gotree.PreOrder:
 		t.iter.next = func() (out *rbNode) {
 			for len(stack) > 0 || current != nil {
@@ -137,41 +115,6 @@ func (t *RbTree) InitIter(order gotree.TravOrder) *rbNode {
 			}
 			return out
 		}
-		/*
-		        iterativePostorder(node)
-		  if node == null then return
-		  nodeStack.push(node)
-		  prevNode = null
-		  while not nodeStack.isEmpty()
-		    currNode = nodeStack.peek()
-		    if prevNode == null or prevNode.left == currNode or prevNode.right == currNode
-		      if currNode.left != null
-		        nodeStack.push(currNode.left)
-		      else if currNode.right != null
-		        nodeStack.push(currNode.right)
-		    else if currNode.left == prevNode
-		      if currNode.right != null
-		        nodeStack.push(currNode.right)
-		    else
-		      visit(currNode)
-		      nodeStack.pop()
-		    prevNode = currNode
-		*/
-		/*
-		   nonRecursivePostorder(rootNode)
-		     nodeStack.push(rootNode)
-		     while (! nodeStack.empty())
-		       currNode = nodeStack.peek()
-		       if ((currNode.left != null) and (currNode.left.visited == false))
-		         nodeStack.push(currNode.left)
-		       else
-		         if ((currNode.right != null) and (currNode.right.visited == false))
-		           nodeStack.push(currNode.right)
-		         else
-		           print currNode.value
-		           currNode.visited := true
-		           nodeStack.pop()
-		*/
 	case gotree.PostOrder:
 		if current == nil {
 			return current
@@ -187,37 +130,25 @@ func (t *RbTree) InitIter(order gotree.TravOrder) *rbNode {
 				if (prevNode == nil) ||
 					(prevNode.left == current) ||
 					(prevNode.right == current) {
-
 					if current.left != nil {
 						stack = append(stack, current.left)
 					} else if current.right != nil {
 						stack = append(stack, current.right)
-					} else {
-						break
 					}
-
 				} else if current.left == prevNode {
-
 					if current.right != nil {
 						stack = append(stack, current.right)
-					} else {
-						break
 					}
-
-				} else if current.right == prevNode {
-					break
 				} else {
-					panic("SHOULD NOT BE HERE")
+					out = current
+					// pop, but no assignment
+					stackIndex := len(stack) - 1
+					stack = stack[0:stackIndex]
+					prevNode = current
+					break
 				}
 				prevNode = current
 			}
-			out = current
-			// pop, but no assignment
-			stackIndex := len(stack) - 1
-			stack = stack[0:stackIndex]
-			prevNode = current
-			fmt.Println(out)
-			fmt.Println(prevNode)
 			return out
 
 		}
@@ -229,6 +160,7 @@ func (t *RbTree) InitIter(order gotree.TravOrder) *rbNode {
 	return t.iter.next()
 
 }
+
 func (t *RbTree) Traverse(order gotree.TravOrder, f gotree.IterFunc) {
 
 	n := t.root
@@ -240,7 +172,7 @@ func (t *RbTree) Traverse(order gotree.TravOrder, f gotree.IterFunc) {
 				return
 			}
 			inorder(node.left)
-			f(node.key, node.value)
+			f(node.Key, node.Value)
 			inorder(node.right)
 		}
 		inorder(n)
@@ -250,11 +182,22 @@ func (t *RbTree) Traverse(order gotree.TravOrder, f gotree.IterFunc) {
 			if node == nil {
 				return
 			}
-			f(node.key, node.value)
+			f(node.Key, node.Value)
 			preorder(node.left)
 			preorder(node.right)
 		}
 		preorder(n)
+	case gotree.PostOrder:
+		var postorder func(node *rbNode)
+		postorder = func(node *rbNode) {
+			if node == nil {
+				return
+			}
+			postorder(node.left)
+			postorder(node.right)
+			f(node.Key, node.Value)
+		}
+		postorder(n)
 	default:
 		s := fmt.Sprintf("rbTree has not implemented %s.", order)
 		panic(s)
@@ -262,22 +205,6 @@ func (t *RbTree) Traverse(order gotree.TravOrder, f gotree.IterFunc) {
 
 }
 
-func (t *RbTree) TraverseIter(f gotree.IterFunc) {
-	node := t.root
-	stack := []*rbNode{nil}
-	for len(stack) != 1 || node != nil {
-		if node != nil {
-			stack = append(stack, node)
-			node = node.left
-		} else {
-			stackIndex := len(stack) - 1
-			node = stack[stackIndex]
-			f(node.key, node.value)
-			stack = stack[0:stackIndex]
-			node = node.right
-		}
-	}
-}
 func (h *rbNode) rotateLeft() (x *rbNode) {
 	x = h.right
 	h.right = x.left
@@ -286,6 +213,7 @@ func (h *rbNode) rotateLeft() (x *rbNode) {
 	h.color = Red
 	return
 }
+
 func (h *rbNode) rotateRight() (x *rbNode) {
 	x = h.left
 	h.left = x.right
@@ -295,30 +223,24 @@ func (h *rbNode) rotateRight() (x *rbNode) {
 	return
 }
 
-func New(cmp gotree.CompareFunc) *RbTree {
-	if cmp == nil {
-		panic("Must define a compare function")
-	}
-	return &RbTree{root: nil, first: nil, last: nil, cmp: cmp}
-}
-
 func (t *RbTree) Search(key interface{}) (value interface{}, ok bool) {
-
 	if key == nil {
 		return
-
 	}
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	x := t.root
 	for x != nil {
-		cmp := t.cmp(x.key, key)
-		if cmp == 0 {
-			return x.value, true
-		} else if cmp > 0 {
+
+		switch t.cmp(x.Key, key) {
+		case gotree.EQ:
+			return x.Value, true
+		case gotree.LT:
 			x = x.left
-		} else {
+		case gotree.GT:
 			x = x.right
+		default:
+			panic("Compare result of undefined")
 		}
 	}
 	return
@@ -329,10 +251,10 @@ func (t *RbTree) Insert(key interface{}, value interface{}) (old interface{}, ok
 	defer t.lock.Unlock()
 
 	if t.root == nil {
-		t.root = &rbNode{color: Red, key: key, value: value, left: nil, right: nil}
+		t.root = &rbNode{color: Red, Key: key, Value: value, left: nil, right: nil}
 	} else {
-		//	t.root = t.insert(t.root, key, value)
-		t.root = t.insertIter(t.root, key, value)
+		t.root = t.insert(t.root, key, value)
+		//t.root = t.insertIter(t.root, key, value)
 	}
 	if t.root.color == Red {
 		t.Height++
@@ -345,12 +267,12 @@ func (t *RbTree) insert(h *rbNode, key interface{}, value interface{}) *rbNode {
 
 	// empty tree
 	if h == nil {
-		return &rbNode{color: Red, key: key, value: value}
+		return &rbNode{color: Red, Key: key, Value: value}
 	}
 
-	switch t.cmp(h.key, key) {
+	switch t.cmp(h.Key, key) {
 	case gotree.EQ:
-		h.value = value
+		h.Value = value
 	case gotree.LT:
 		h.left = t.insert(h.left, key, value)
 	case gotree.GT:
@@ -372,11 +294,20 @@ func (t *RbTree) insert(h *rbNode, key interface{}, value interface{}) *rbNode {
 	return h
 }
 
+func (h *rbNode) isRed() bool {
+	return h != nil && h.color == Red
+}
+func (h *rbNode) colorFlip() {
+	h.color = !h.color
+	h.left.color = !h.left.color
+	h.right.color = !h.right.color
+}
+
 func (t *RbTree) insertIter(h *rbNode, key interface{}, value interface{}) *rbNode {
 
 	// empty tree
 	if h == nil {
-		return &rbNode{color: Red, key: key, value: value}
+		return &rbNode{color: Red, Key: key, Value: value}
 	}
 
 	// setup our own stack and helpers
@@ -388,9 +319,9 @@ func (t *RbTree) insertIter(h *rbNode, key interface{}, value interface{}) *rbNo
 
 L:
 	for {
-		switch t.cmp(h.key, key) {
+		switch t.cmp(h.Key, key) {
 		case gotree.EQ:
-			h.value = value
+			h.Value = value
 			return t.root // no need for rest of the fix code
 		case gotree.LT:
 			prior = h
@@ -398,7 +329,7 @@ L:
 			count++
 			h = h.left
 			if h == nil {
-				h = &rbNode{color: Red, key: key, value: value}
+				h = &rbNode{color: Red, Key: key, Value: value}
 				prior.left = h
 				break L
 			}
@@ -408,7 +339,7 @@ L:
 			count++
 			h = h.right
 			if h == nil {
-				h = &rbNode{color: Red, key: key, value: value}
+				h = &rbNode{color: Red, Key: key, Value: value}
 				prior.right = h
 				break L
 			}
@@ -444,7 +375,7 @@ L2:
 
 		if count > 0 {
 
-			switch t.cmp(stack[count-1].key, h.key) {
+			switch t.cmp(stack[count-1].Key, h.Key) {
 			case gotree.LT:
 				stack[count-1].left = h
 			case gotree.GT:
@@ -458,12 +389,19 @@ L2:
 	return h
 }
 
-func (h *rbNode) isRed() bool {
-	return h != nil && h.color == Red
-}
-
-func (h *rbNode) colorFlip() {
-	h.color = !h.color
-	h.left.color = !h.left.color
-	h.right.color = !h.right.color
+func (t *RbTree) TraverseIter(f gotree.IterFunc) {
+	node := t.root
+	stack := []*rbNode{nil}
+	for len(stack) != 1 || node != nil {
+		if node != nil {
+			stack = append(stack, node)
+			node = node.left
+		} else {
+			stackIndex := len(stack) - 1
+			node = stack[stackIndex]
+			f(node.Key, node.Value)
+			stack = stack[0:stackIndex]
+			node = node.right
+		}
+	}
 }
