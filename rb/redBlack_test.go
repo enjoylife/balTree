@@ -2,15 +2,18 @@ package gorbtree
 
 import (
 	"fmt"
-	//	"github.com/davecgh/go-spew/spew"
+	"github.com/davecgh/go-spew/spew"
 	"gotree"
 	"math/rand"
 	"testing"
 )
 
+var _ = spew.Dump
+
 var _ = fmt.Printf
 
-func testCmp(a interface{}, b interface{}) gotree.Direction {
+/* Testing Compare function: int */
+func testCmpInt(a interface{}, b interface{}) gotree.Direction {
 	switch result := (a.(int) - b.(int)); {
 	case result > 0:
 		return gotree.LT
@@ -23,6 +26,7 @@ func testCmp(a interface{}, b interface{}) gotree.Direction {
 	}
 }
 
+/* Testing Compare function: string */
 func testCmpString(c interface{}, d interface{}) gotree.Direction {
 	a := c.(string)
 	b := d.(string)
@@ -66,8 +70,7 @@ func isBalanced(t *RbTree) bool {
 			black++
 		}
 	}
-	fmt.Println("Black count", black)
-	return nodeIsBalanced(t.root, black)
+	return nodeIsBalanced(t.root, black) && t.Height == black
 }
 
 func nodeIsBalanced(n *rbNode, black int) bool {
@@ -94,34 +97,108 @@ func inc(t *testing.T) func(key interface{}, value interface{}) {
 	}
 }
 
-/*func accumulate(t *testing.T,store, []string) func(key interface{}, value interface{}){
-    return func( key interface{}, value interface{}){
-    }
-}*/
-
 func TestInsert(t *testing.T) {
 
 	r := rand.New(rand.NewSource(int64(5)))
-	tree := New(testCmp)
-	iters := 10
+	tree := New(testCmpInt)
+	iters := 10000
 	for i := 0; i < iters; i++ {
 		item := r.Int()
 		item = i
 		tree.Insert(item, item)
 	}
-	fmt.Println(isBalanced(tree))
-	fmt.Println(tree.Height)
-	var black int
-	for x := tree.root; x != nil; x = x.left {
-		if x.color == Black {
-			black++
-		}
+	if !isBalanced(tree) {
+		t.Errorf("Tree is not balanced")
 	}
-	if black != tree.Height {
-		t.Errorf("Height is not correct got %d, should be", tree.Height, black)
+	tree.Traverse(gotree.InOrder, inc(t))
+}
+
+func TestIterIn(t *testing.T) {
+
+	tree := New(testCmpInt)
+	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
+	for i, v := range items {
+		tree.Insert(i, v)
+	}
+	if !isBalanced(tree) {
+		t.Errorf("Tree is not balanced")
 	}
 
-	tree.Traverse(gotree.InOrder, inc(t))
+	count := 0
+	for i, n := 0, tree.InitIter(gotree.InOrder); n != nil; i, n = i+1, tree.Next() {
+
+		count++
+		if items[i] != n.value {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.value, items[i])
+		}
+
+	}
+	if count != len(items) {
+		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
+	}
+
+}
+
+func TestIterPre(t *testing.T) {
+
+	tree := New(testCmpInt)
+	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
+	//F, B, A, D, C, E, G, I, H
+	order := []string{"d", "b", "a", "c", "h", "f", "e", "g", "i"}
+	for i, v := range items {
+		tree.Insert(i, v)
+	}
+	if !isBalanced(tree) {
+		t.Errorf("Tree is not balanced")
+	}
+	//tree.Traverse(gotree.PreOrder, printNode)
+	//scs := spew.ConfigState{Indent: "\t"}
+	//scs.Dump(tree.root)
+
+	count := 0
+	for i, n := 0, tree.InitIter(gotree.PreOrder); n != nil; i, n = i+1, tree.Next() {
+
+		count++
+		if order[i] != n.value {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.value, order[i])
+		}
+
+	}
+
+	if count != len(items) {
+		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
+	}
+
+}
+
+func TestIterPost(t *testing.T) {
+
+	tree := New(testCmpInt)
+	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
+	//F, B, A, D, C, E, G, I, H
+	order := []string{"a", "c", "b", "e", "g", "f", "i", "h", "d"}
+	for i, v := range items {
+		tree.Insert(i, v)
+	}
+	if !isBalanced(tree) {
+		t.Errorf("Tree is not balanced")
+	}
+	//tree.Traverse(gotree.PostOrder, printNode)
+
+	count := 0
+	for i, n := 0, tree.InitIter(gotree.PostOrder); n != nil; i, n = i+1, tree.Next() {
+
+		count++
+		if order[i] != n.value {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.value, order[i])
+		}
+
+	}
+
+	if count != len(items) {
+		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
+	}
+
 }
 
 func TestTraversal(t *testing.T) {
@@ -130,7 +207,10 @@ func TestTraversal(t *testing.T) {
 	for _, v := range items {
 		tree.Insert(v, v)
 	}
-	tree.Traverse(gotree.InOrder, printNode)
+	if !isBalanced(tree) {
+		t.Errorf("Tree is not balanced")
+	}
+	//tree.Traverse(gotree.InOrder, printNode)
 
 }
 
@@ -150,7 +230,7 @@ func BenchmarkInsert(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
-	tree := New(testCmp)
+	tree := New(testCmpInt)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		tree.Insert(r.Int(), r.Int())

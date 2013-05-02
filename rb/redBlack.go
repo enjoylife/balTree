@@ -80,6 +80,7 @@ iterativeInorder(node)
       node = parentStack.pop()
       visit(node)
       node = node.right
+
 */
 
 func (t *RbTree) Next() *rbNode {
@@ -92,30 +93,140 @@ func (t *RbTree) InitIter(order gotree.TravOrder) *rbNode {
 	switch order {
 	case gotree.InOrder:
 		t.iter.next = func() (out *rbNode) {
-
-			if len(stack) > 0 || current != nil {
+			for len(stack) > 0 || current != nil {
 				if current != nil {
 					stack = append(stack, current)
 					current = current.left
 				} else {
+					// pop
 					stackIndex := len(stack) - 1
 					out = stack[stackIndex]
+					current = out
 					stack = stack[0:stackIndex]
 					current = current.right
+					break
 				}
-				return out
-			} else {
-				return nil
 			}
+			return out
 		}
 
-		//case gotree.PreOrder:
-		//case gotree.PostOrder:
+		/*iterativePreorder(node)
+		  parentStack = empty stack
+		  while not parentStack.isEmpty() or node != null
+		    if node != null then
+		      visit(node)
+		      parentStack.push(node.right)
+		      node = node.left
+		    else
+		      node = parentStack.pop()
+		*/
+	case gotree.PreOrder:
+		t.iter.next = func() (out *rbNode) {
+			for len(stack) > 0 || current != nil {
+				if current != nil {
+					out = current
+					stack = append(stack, current.right)
+					current = current.left
+					break
+				} else {
+					// pop
+					stackIndex := len(stack) - 1
+					current = stack[stackIndex]
+					stack = stack[0:stackIndex]
+				}
+			}
+			return out
+		}
+		/*
+		        iterativePostorder(node)
+		  if node == null then return
+		  nodeStack.push(node)
+		  prevNode = null
+		  while not nodeStack.isEmpty()
+		    currNode = nodeStack.peek()
+		    if prevNode == null or prevNode.left == currNode or prevNode.right == currNode
+		      if currNode.left != null
+		        nodeStack.push(currNode.left)
+		      else if currNode.right != null
+		        nodeStack.push(currNode.right)
+		    else if currNode.left == prevNode
+		      if currNode.right != null
+		        nodeStack.push(currNode.right)
+		    else
+		      visit(currNode)
+		      nodeStack.pop()
+		    prevNode = currNode
+		*/
+		/*
+		   nonRecursivePostorder(rootNode)
+		     nodeStack.push(rootNode)
+		     while (! nodeStack.empty())
+		       currNode = nodeStack.peek()
+		       if ((currNode.left != null) and (currNode.left.visited == false))
+		         nodeStack.push(currNode.left)
+		       else
+		         if ((currNode.right != null) and (currNode.right.visited == false))
+		           nodeStack.push(currNode.right)
+		         else
+		           print currNode.value
+		           currNode.visited := true
+		           nodeStack.pop()
+		*/
+	case gotree.PostOrder:
+		if current == nil {
+			return current
+		}
+		stack = append(stack, current)
+		var prevNode *rbNode = nil
+
+		t.iter.next = func() (out *rbNode) {
+			for len(stack) > 0 {
+				// peek
+				stackIndex := len(stack) - 1
+				current = stack[stackIndex]
+				if (prevNode == nil) ||
+					(prevNode.left == current) ||
+					(prevNode.right == current) {
+
+					if current.left != nil {
+						stack = append(stack, current.left)
+					} else if current.right != nil {
+						stack = append(stack, current.right)
+					} else {
+						break
+					}
+
+				} else if current.left == prevNode {
+
+					if current.right != nil {
+						stack = append(stack, current.right)
+					} else {
+						break
+					}
+
+				} else if current.right == prevNode {
+					break
+				} else {
+					panic("SHOULD NOT BE HERE")
+				}
+				prevNode = current
+			}
+			out = current
+			// pop, but no assignment
+			stackIndex := len(stack) - 1
+			stack = stack[0:stackIndex]
+			prevNode = current
+			fmt.Println(out)
+			fmt.Println(prevNode)
+			return out
+
+		}
 	default:
 		s := fmt.Sprintf("rbTree has not implemented %s for iteration.", order)
 		panic(s)
 	}
-	return t.root
+	// return our first node
+	return t.iter.next()
 
 }
 func (t *RbTree) Traverse(order gotree.TravOrder, f gotree.IterFunc) {
@@ -143,9 +254,7 @@ func (t *RbTree) Traverse(order gotree.TravOrder, f gotree.IterFunc) {
 			preorder(node.left)
 			preorder(node.right)
 		}
-
 		preorder(n)
-
 	default:
 		s := fmt.Sprintf("rbTree has not implemented %s.", order)
 		panic(s)
