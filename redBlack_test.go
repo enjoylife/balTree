@@ -11,6 +11,11 @@ var _ = spew.Dump
 
 var _ = fmt.Printf
 
+const (
+	searchTotal = 100000
+	searchSpace = searchTotal / 2
+)
+
 /* Testing Compare function: int */
 func testCmpInt(a interface{}, b interface{}) Direction {
 	switch result := (a.(int) - b.(int)); {
@@ -59,7 +64,7 @@ func printNode(key interface{}, value interface{}) {
 	fmt.Println("VALUE: ", value)
 }
 
-func isBalanced(t *RbTree) bool {
+func isBalanced(t *RBTree) bool {
 	if t == nil {
 		return true
 	}
@@ -72,7 +77,7 @@ func isBalanced(t *RbTree) bool {
 	return nodeIsBalanced(t.root, black) && t.Height == black
 }
 
-func nodeIsBalanced(n *rbNode, black int) bool {
+func nodeIsBalanced(n *Node, black int) bool {
 	if n == nil && black == 0 {
 		return true
 	} else if n == nil && black != 0 {
@@ -145,6 +150,40 @@ func TestSearch(t *testing.T) {
 	}
 }
 
+func TestSearchRecursive(t *testing.T) {
+
+	tree := New(testCmpInt)
+	iters := 10000
+	for i := 0; i < iters; i++ {
+		tree.Insert(i, i)
+	}
+	_, ok := tree.SearchRecurse(nil)
+	if ok {
+		t.Errorf("Not minding nil key's")
+	}
+
+	tree.Traverse(InOrder, inc(t))
+	for i := 0; i < iters; i++ {
+		value, ok := tree.SearchRecurse(i)
+		if !ok {
+			t.Errorf("All these values should be present")
+		}
+		if value != i {
+			t.Errorf("Values don't match Exp: %d, Got: %d", i, value)
+		}
+	}
+
+	for i := iters; i < iters*2; i++ {
+		value, ok := tree.SearchRecurse(i)
+		if ok {
+			t.Errorf("values should not be present")
+		}
+		if value != nil {
+			t.Errorf("Values don't match Exp: %d, Got: %d", i, value)
+		}
+	}
+}
+
 func TestIterIn(t *testing.T) {
 
 	tree := New(testCmpInt)
@@ -163,8 +202,8 @@ func TestIterIn(t *testing.T) {
 	for i, n := 0, tree.InitIter(InOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if items[i] != n.Value() {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value(), items[i])
+		if items[i] != n.Value {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, items[i])
 		}
 
 	}
@@ -175,8 +214,8 @@ func TestIterIn(t *testing.T) {
 	for i, n := 0, tree.InitIter(PreOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if preOrder[i] != n.Value() {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value(), preOrder[i])
+		if preOrder[i] != n.Value {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, preOrder[i])
 		}
 
 	}
@@ -187,8 +226,8 @@ func TestIterIn(t *testing.T) {
 	for i, n := 0, tree.InitIter(PostOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if postOrder[i] != n.Value() {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value(), postOrder[i])
+		if postOrder[i] != n.Value {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, postOrder[i])
 		}
 
 	}
@@ -223,11 +262,11 @@ func BenchmarkMapInsert(b *testing.B) {
 	m := make(map[int]int)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		m[r.Int()] = r.Int()
+		a := r.Int()
+		m[a] = a
 	}
 
 }
-
 func BenchmarkInsert(b *testing.B) {
 
 	b.StopTimer()
@@ -235,31 +274,147 @@ func BenchmarkInsert(b *testing.B) {
 	tree := New(testCmpInt)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
+		a := r.Int()
+		tree.Insert(a, a)
+	}
+}
+
+func BenchmarkSearch(b *testing.B) {
+
+	b.StopTimer()
+	r := rand.New(rand.NewSource(int64(5)))
+	m := make(map[int]int)
+	tree := New(testCmpInt)
+	for i := 0; i < searchTotal; i++ {
+		a := r.Intn(searchSpace)
+		m[a] = a
+		tree.Insert(a, a)
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		a := r.Intn(searchSpace)
+		tree.Search(a)
+	}
+}
+
+func BenchmarkSearchRecurse(b *testing.B) {
+
+	b.StopTimer()
+	r := rand.New(rand.NewSource(int64(5)))
+	m := make(map[int]int)
+	tree := New(testCmpInt)
+	for i := 0; i < searchTotal; i++ {
+		a := r.Intn(searchSpace)
+		m[a] = a
+		tree.Insert(a, a)
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		a := r.Intn(searchSpace)
+		tree.SearchRecurse(a)
+	}
+}
+func BenchmarkIterInOrder(b *testing.B) {
+
+	b.StopTimer()
+	r := rand.New(rand.NewSource(int64(5)))
+	tree := New(testCmpInt)
+	for i := 0; i < 1000; i++ {
 		tree.Insert(r.Int(), r.Int())
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		sum := 0
+
+		for i, n := 0, tree.InitIter(InOrder); n != nil; i, n = i+1, tree.Next() {
+			sum += n.Value.(int)
+		}
+	}
+
+}
+
+func BenchmarkIterPreOrder(b *testing.B) {
+
+	b.StopTimer()
+	r := rand.New(rand.NewSource(int64(5)))
+	tree := New(testCmpInt)
+	for i := 0; i < 1000; i++ {
+		tree.Insert(r.Int(), r.Int())
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		sum := 0
+
+		for i, n := 0, tree.InitIter(PreOrder); n != nil; i, n = i+1, tree.Next() {
+			sum += n.Value.(int)
+		}
+	}
+
+}
+
+func BenchmarkIterPostOrder(b *testing.B) {
+
+	b.StopTimer()
+	r := rand.New(rand.NewSource(int64(5)))
+	tree := New(testCmpInt)
+	for i := 0; i < 1000; i++ {
+		tree.Insert(r.Int(), r.Int())
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		sum := 0
+
+		for i, n := 0, tree.InitIter(PostOrder); n != nil; i, n = i+1, tree.Next() {
+			sum += n.Value.(int)
+		}
+	}
+
+}
+
+func recurse() func(key interface{}, value interface{}) {
+	var sum int = 0
+	return func(key interface{}, value interface{}) {
+		sum += value.(int)
+	}
+}
+
+func BenchmarkRecursePostOrder(b *testing.B) {
+
+	b.StopTimer()
+	r := rand.New(rand.NewSource(int64(5)))
+	tree := New(testCmpInt)
+	for i := 0; i < 1000; i++ {
+		tree.Insert(r.Int(), r.Int())
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		f := recurse()
+		tree.Traverse(PostOrder, f)
+
 	}
 
 }
 
 /* Experiments: not used */
-func (t *RbTree) insertIter(h *rbNode, key interface{}, value interface{}) *rbNode {
+func (t *RBTree) insertIter(h *Node, key interface{}, value interface{}) *Node {
 
 	// empty tree
 	if h == nil {
-		return &rbNode{color: Red, key: key, value: value}
+		return &Node{color: Red, Key: key, Value: value}
 	}
 
 	// setup our own stack and helpers
 	var (
-		stack     = []*rbNode{}
+		stack     = []*Node{}
 		count int = 0
-		prior *rbNode
+		prior *Node
 	)
 
 L:
 	for {
 		switch t.cmp(h.Key, key) {
 		case EQ:
-			h.value = value
+			h.Value = value
 			return t.root // no need for rest of the fix code
 		case LT:
 			prior = h
@@ -267,7 +422,7 @@ L:
 			count++
 			h = h.left
 			if h == nil {
-				h = &rbNode{color: Red, key: key, value: value}
+				h = &Node{color: Red, Key: key, Value: value}
 				prior.left = h
 				break L
 			}
@@ -277,7 +432,7 @@ L:
 			count++
 			h = h.right
 			if h == nil {
-				h = &rbNode{color: Red, key: key, value: value}
+				h = &Node{color: Red, Key: key, Value: value}
 				prior.right = h
 				break L
 			}
@@ -326,9 +481,9 @@ L2:
 
 	return h
 }
-func (t *RbTree) TraverseIter(f IterFunc) {
+func (t *RBTree) TraverseIter(f IterFunc) {
 	node := t.root
-	stack := []*rbNode{nil}
+	stack := []*Node{nil}
 	for len(stack) != 1 || node != nil {
 		if node != nil {
 			stack = append(stack, node)
@@ -336,7 +491,7 @@ func (t *RbTree) TraverseIter(f IterFunc) {
 		} else {
 			stackIndex := len(stack) - 1
 			node = stack[stackIndex]
-			f(node.Key, node.value)
+			f(node.Key, node.Value)
 			stack = stack[0:stackIndex]
 			node = node.right
 		}

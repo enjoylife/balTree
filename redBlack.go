@@ -2,17 +2,16 @@ package gotree
 
 import (
 	"fmt"
-	"sync"
 )
 
 type color bool
 
 const (
-	Red   color = true
-	Black color = false
+	Red   color = false //default
+	Black color = true
 )
 
-/* For pretty output when debuging */
+// Pretty output for errors, debuging, etc.
 func (c color) String() string {
 	var s string
 	switch c {
@@ -25,65 +24,61 @@ func (c color) String() string {
 }
 
 // Exports a key and value
-type rbNode struct {
-	key, value  interface{}
-	left, right *rbNode
+type Node struct {
+	Key, Value  interface{}
+	left, right *Node
 	color       color
-}
-
-func (n *rbNode) Key() interface{} {
-	return n.key
-}
-func (n *rbNode) Value() interface{} {
-	return n.value
 }
 
 // internal
 type rbIter struct {
-	current *rbNode
-	stack   []*rbNode
-	next    func() *rbNode
+	current *Node
+	stack   []*Node
+	next    func() *Node
 }
 
 // Exports a Height, Size, and
-type RbTree struct {
+type RBTree struct {
 	Height      int
 	Size        int
-	first, last *rbNode
+	first, last *Node
 	iter        rbIter
-	root        *rbNode
+	root        *Node
 	cmp         CompareFunc
-	lock        sync.RWMutex
 }
 
-// creates a RbTree for use.
+// creates a RBTree for use.
 // Must give it a compare function, see common.go for an example
-func New(cmp CompareFunc) *RbTree {
+func New(cmp CompareFunc) *RBTree {
 	if cmp == nil {
 		panic("Must define a compare function")
 	}
-	return &RbTree{root: nil, first: nil, last: nil, cmp: cmp}
+	return &RBTree{root: nil, first: nil, last: nil, cmp: cmp}
 }
 
-func (t *RbTree) Min() Node {
+func (t *RBTree) Min() *Node {
 	return t.first
 }
 
-func (t *RbTree) Max() Node {
+func (t *RBTree) Max() *Node {
 	return t.last
 }
 
-func (t *RbTree) Next() *rbNode {
+func (t *RBTree) Next() *Node {
 
-	return (t.iter.next())
+	n := t.iter.next()
+	if n == nil {
+	}
+	return n
+
 }
 
-func (t *RbTree) InitIter(order TravOrder) *rbNode {
+func (t *RBTree) InitIter(order TravOrder) *Node {
 	current := t.root
-	stack := []*rbNode{}
+	stack := []*Node{}
 	switch order {
 	case InOrder:
-		t.iter.next = func() (out *rbNode) {
+		t.iter.next = func() (out *Node) {
 			for len(stack) > 0 || current != nil {
 				if current != nil {
 					stack = append(stack, current)
@@ -102,7 +97,7 @@ func (t *RbTree) InitIter(order TravOrder) *rbNode {
 		}
 
 	case PreOrder:
-		t.iter.next = func() (out *rbNode) {
+		t.iter.next = func() (out *Node) {
 			for len(stack) > 0 || current != nil {
 				if current != nil {
 					out = current
@@ -123,9 +118,9 @@ func (t *RbTree) InitIter(order TravOrder) *rbNode {
 			return current
 		}
 		stack = append(stack, current)
-		var prevNode *rbNode = nil
+		var prevNode *Node = nil
 
-		t.iter.next = func() (out *rbNode) {
+		t.iter.next = func() (out *Node) {
 			for len(stack) > 0 {
 				// peek
 				stackIndex := len(stack) - 1
@@ -164,41 +159,41 @@ func (t *RbTree) InitIter(order TravOrder) *rbNode {
 
 }
 
-func (t *RbTree) Traverse(order TravOrder, f IterFunc) {
+func (t *RBTree) Traverse(order TravOrder, f IterFunc) {
 
 	n := t.root
 	switch order {
 	case InOrder:
-		var inorder func(node *rbNode)
-		inorder = func(node *rbNode) {
+		var inorder func(node *Node)
+		inorder = func(node *Node) {
 			if node == nil {
 				return
 			}
 			inorder(node.left)
-			f(node.key, node.value)
+			f(node.Key, node.Value)
 			inorder(node.right)
 		}
 		inorder(n)
 	case PreOrder:
-		var preorder func(node *rbNode)
-		preorder = func(node *rbNode) {
+		var preorder func(node *Node)
+		preorder = func(node *Node) {
 			if node == nil {
 				return
 			}
-			f(node.key, node.value)
+			f(node.Key, node.Value)
 			preorder(node.left)
 			preorder(node.right)
 		}
 		preorder(n)
 	case PostOrder:
-		var postorder func(node *rbNode)
-		postorder = func(node *rbNode) {
+		var postorder func(node *Node)
+		postorder = func(node *Node) {
 			if node == nil {
 				return
 			}
 			postorder(node.left)
 			postorder(node.right)
-			f(node.key, node.value)
+			f(node.Key, node.Value)
 		}
 		postorder(n)
 	default:
@@ -208,7 +203,7 @@ func (t *RbTree) Traverse(order TravOrder, f IterFunc) {
 
 }
 
-func (h *rbNode) rotateLeft() (x *rbNode) {
+func (h *Node) rotateLeft() (x *Node) {
 	x = h.right
 	h.right = x.left
 	x.left = h
@@ -217,7 +212,7 @@ func (h *rbNode) rotateLeft() (x *rbNode) {
 	return
 }
 
-func (h *rbNode) rotateRight() (x *rbNode) {
+func (h *Node) rotateRight() (x *Node) {
 	x = h.left
 	h.left = x.right
 	x.right = h
@@ -226,18 +221,16 @@ func (h *rbNode) rotateRight() (x *rbNode) {
 	return
 }
 
-func (t *RbTree) Search(key interface{}) (value interface{}, ok bool) {
+func (t *RBTree) Search(key interface{}) (value interface{}, ok bool) {
 	if key == nil {
 		return
 	}
-	t.lock.RLock()
-	defer t.lock.RUnlock()
 	x := t.root
 	for x != nil {
 
-		switch t.cmp(x.key, key) {
+		switch t.cmp(x.Key, key) {
 		case EQ:
-			return x.value, true
+			return x.Value, true
 		case LT:
 			x = x.left
 		case GT:
@@ -249,15 +242,39 @@ func (t *RbTree) Search(key interface{}) (value interface{}, ok bool) {
 	return
 }
 
-func (t *RbTree) Insert(key interface{}, value interface{}) (old interface{}, ok bool) {
+// Get an Item in the tree.
+func (t *RBTree) SearchRecurse(key interface{}) (value interface{}, ok bool) {
+
 	if key == nil {
 		return
 	}
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	return t.get(t.root, key)
+}
+
+func (t *RBTree) get(node *Node, key interface{}) (value interface{}, ok bool) {
+	if node == nil {
+		return nil, false
+	}
+
+	switch t.cmp(node.Key, key) {
+	case EQ:
+		return node.Value, true
+	case LT:
+		return t.get(node.left, key)
+	case GT:
+		return t.get(node.right, key)
+	default:
+		panic("Compare result of undefined")
+	}
+}
+
+func (t *RBTree) Insert(key interface{}, value interface{}) (old interface{}, ok bool) {
+	if key == nil {
+		return
+	}
 
 	if t.root == nil {
-		t.root = &rbNode{color: Red, key: key, value: value, left: nil, right: nil}
+		t.root = &Node{color: Red, Key: key, Value: value, left: nil, right: nil}
 		t.first = t.root
 		t.last = t.root
 	} else {
@@ -271,26 +288,26 @@ func (t *RbTree) Insert(key interface{}, value interface{}) (old interface{}, ok
 	return
 }
 
-func (t *RbTree) insert(h *rbNode, key interface{}, value interface{}) *rbNode {
+func (t *RBTree) insert(h *Node, key interface{}, value interface{}) *Node {
 	if h == nil {
 		// base case, insert do stuff on new node
-		n := &rbNode{color: Red, key: key, value: value}
+		n := &Node{color: Red, Key: key, Value: value}
 		// set Min
-		switch t.cmp(t.first.key, key) {
+		switch t.cmp(t.first.Key, key) {
 		case GT:
 			t.first = n
 		}
 		// set Max
-		switch t.cmp(t.last.key, key) {
+		switch t.cmp(t.last.Key, key) {
 		case LT:
 			t.last = n
 		}
 		return n
 	}
 
-	switch t.cmp(h.key, key) {
+	switch t.cmp(h.Key, key) {
 	case EQ:
-		h.value = value
+		h.Value = value
 	case LT:
 		h.left = t.insert(h.left, key, value)
 	case GT:
@@ -312,11 +329,38 @@ func (t *RbTree) insert(h *rbNode, key interface{}, value interface{}) *rbNode {
 	return h
 }
 
-func (h *rbNode) isRed() bool {
+func (h *Node) isRed() bool {
 	return h != nil && h.color == Red
 }
-func (h *rbNode) colorFlip() {
+func (h *Node) colorFlip() {
 	h.color = !h.color
 	h.left.color = !h.left.color
 	h.right.color = !h.right.color
+}
+
+/* Experinmental */
+//Return a complete copy(view) of tree to work on.
+// TODO Deep copy
+func (t *RBTree) CopyiedSliceIter(order TravOrder) []*Node {
+	tCopy := []*Node{}
+	f := func(key interface{}, value interface{}) {
+		tCopy = append(tCopy, &Node{Key: key, Value: value})
+	}
+	switch order {
+	case InOrder:
+		t.Traverse(InOrder, f)
+	case PreOrder:
+		t.Traverse(PreOrder, f)
+	case PostOrder:
+		t.Traverse(PostOrder, f)
+	default:
+		s := fmt.Sprintf("rbTree has not implemented %s for iteration.", order)
+		panic(s)
+	}
+	t.iter.next = func() (out *Node) {
+		return
+	}
+	// return our first node
+	return tCopy
+
 }

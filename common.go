@@ -83,12 +83,6 @@ EX:
 */
 type IterFunc func(interface{}, interface{})
 
-type Node interface {
-	//New(key interface{}, value interface{}, extra ...interface{})
-	Key() interface{}
-	Value() interface{}
-}
-
 /*
 type Tree interface {
 	Search(interface{}) (interface{}, bool)
