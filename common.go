@@ -30,17 +30,17 @@ func (order TravOrder) String() string {
 }
 
 // Possible directions our path down the tree may take
-type Direction int
+type Balance int
 
 const (
-	GT Direction = iota
+	GT Balance = iota
 	EQ
 	LT
 )
 
-// human readable representation of Direction values
+// human readable representation of Balance values
 // used for debug and error reporting
-func (d Direction) String() string {
+func (d Balance) String() string {
 	var s string
 	switch d {
 	case GT:
@@ -54,11 +54,11 @@ func (d Direction) String() string {
 }
 
 /*
-Needed function to determine insertion order, and compare our stored types equality.
-We compare the First param to the second, so if first param is bigger then GT, if equal EQ, etc.
+Needed function to determine insertion order, and compare our stored types equality. Param a and param b are keys of nodes within a tree.
+We compare the first param to the second, so if first param is bigger then GT, if equal EQ, etc.
 
 EX:
-    func testCmp(a interface{}, b interface{}) gotree.Direction {
+    func testCmp(a interface{}, b interface{}) gotree.Balance {
         // we assume we are handling int's
         switch result := (a.(int) - b.(int)); {
         case result > 0:
@@ -72,7 +72,13 @@ EX:
         }
     }
 */
-type CompareFunc func(interface{}, interface{}) Direction
+type CompareFunc func(interface{}, interface{}) Balance
+
+// A Comparable is a type that can be inserted into a Tree or used as a range
+// or equality query on the tree,
+type Comparable interface {
+	Compare(Comparable) Balance
+}
 
 /*
 Our function we can give to our iterators to work with our stored types.
@@ -81,14 +87,11 @@ EX:
         fmt.Printf("keyType: %T, valueType: %T \n", key, value)
     }
 */
-type IterFunc func(interface{}, interface{})
+type IterFunc func(*Node)
 
-/*
-type Tree interface {
-	Search(interface{}) (interface{}, bool)
-	Insert(interface{}, interface{}) (interface{}, bool)
-	Remove(interface{}) (interface{}, bool)
-	Next() *Node
-	Prev() *Node
-	Traverse(IterFunc)
-}*/
+type TreeNode interface {
+	Key() interface{}
+	Value() interface{}
+	leftChild() *TreeNode
+	lightChild() *TreeNode
+}

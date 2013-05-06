@@ -7,6 +7,11 @@ import (
 	"testing"
 )
 
+func init() {
+	// so that every run is the same seq of rand numbers
+	rand.Seed(0)
+}
+
 var _ = spew.Dump
 
 var _ = fmt.Printf
@@ -16,8 +21,31 @@ const (
 	searchSpace = searchTotal / 2
 )
 
+type ExInt int
+
+func (this ExInt) Compare(b Comparable) Balance {
+	switch that := b.(type) {
+	case ExInt:
+		switch result := int(this - that); {
+		case result > 0:
+			return LT
+		case result < 0:
+			return GT
+		case result == 0:
+			return EQ
+		default:
+			panic("Invalid Compare function Result")
+		}
+
+	default:
+		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
+		panic(s)
+	}
+
+}
+
 /* Testing Compare function: int */
-func testCmpInt(a interface{}, b interface{}) Direction {
+func testCmpInt(a interface{}, b interface{}) Balance {
 	switch result := (a.(int) - b.(int)); {
 	case result > 0:
 		return LT
@@ -31,7 +59,7 @@ func testCmpInt(a interface{}, b interface{}) Direction {
 }
 
 /* Testing Compare function: string */
-func testCmpString(c interface{}, d interface{}) Direction {
+func testCmpString(c interface{}, d interface{}) Balance {
 	a := c.(string)
 	b := d.(string)
 	min := len(b)
@@ -60,8 +88,8 @@ func testCmpString(c interface{}, d interface{}) Direction {
 
 /* Helpers for tree traversal and testing tree properties */
 
-func printNode(key interface{}, value interface{}) {
-	fmt.Println("VALUE: ", value)
+func printNode(n *Node) {
+	fmt.Println("VALUE: ", n.Value)
 }
 
 func isBalanced(t *RBTree) bool {
@@ -69,6 +97,7 @@ func isBalanced(t *RBTree) bool {
 		return true
 	}
 	var black int // number of black links on path from root to min
+	black = 0
 	for x := t.root; x != nil; x = x.left {
 		if x.color == Black {
 			black++
@@ -89,14 +118,14 @@ func nodeIsBalanced(n *Node, black int) bool {
 	return nodeIsBalanced(n.left, black) && nodeIsBalanced(n.right, black)
 }
 
-func inc(t *testing.T) func(key interface{}, value interface{}) {
+func inc(t *testing.T) func(n *Node) {
 	var prior int = -1
-	return func(key interface{}, value interface{}) {
-		if prior < value.(int) {
+	return func(n *Node) {
+		if prior < n.Value.(int) {
 			//fmt.Println("VALUE: ", value.(int))
-			prior = value.(int)
+			prior = n.Value.(int)
 		} else {
-			t.Errorf("Prior: %d, Current: %d", prior, value.(int))
+			t.Errorf("Prior: %d, Current: %d", prior, n.Value.(int))
 		}
 	}
 }
@@ -150,38 +179,31 @@ func TestSearch(t *testing.T) {
 	}
 }
 
-func TestSearchRecursive(t *testing.T) {
+func TestRemove(t *testing.T) {
 
 	tree := New(testCmpInt)
-	iters := 10000
+	iters := 1000
 	for i := 0; i < iters; i++ {
 		tree.Insert(i, i)
 	}
-	_, ok := tree.SearchRecurse(nil)
-	if ok {
-		t.Errorf("Not minding nil key's")
-	}
 
-	tree.Traverse(InOrder, inc(t))
 	for i := 0; i < iters; i++ {
-		value, ok := tree.SearchRecurse(i)
-		if !ok {
-			t.Errorf("All these values should be present")
+		tree.Remove(i)
+
+		black := 0
+		for x := tree.root; x != nil; x = x.left {
+			if x.color == Black {
+				black++
+			}
 		}
-		if value != i {
-			t.Errorf("Values don't match Exp: %d, Got: %d", i, value)
+
+		if !isBalanced(tree) {
+			fmt.Println("Height", tree.Height)
+			fmt.Println("Calc Height", black)
+			t.Errorf("Tree is not balanced")
 		}
 	}
 
-	for i := iters; i < iters*2; i++ {
-		value, ok := tree.SearchRecurse(i)
-		if ok {
-			t.Errorf("values should not be present")
-		}
-		if value != nil {
-			t.Errorf("Values don't match Exp: %d, Got: %d", i, value)
-		}
-	}
 }
 
 func TestIterIn(t *testing.T) {
@@ -267,6 +289,7 @@ func BenchmarkMapInsert(b *testing.B) {
 	}
 
 }
+
 func BenchmarkInsert(b *testing.B) {
 
 	b.StopTimer()
@@ -278,7 +301,6 @@ func BenchmarkInsert(b *testing.B) {
 		tree.Insert(a, a)
 	}
 }
-
 func BenchmarkSearch(b *testing.B) {
 
 	b.StopTimer()
@@ -297,23 +319,23 @@ func BenchmarkSearch(b *testing.B) {
 	}
 }
 
-func BenchmarkSearchRecurse(b *testing.B) {
+func BenchmarkRemove(b *testing.B) {
 
 	b.StopTimer()
-	r := rand.New(rand.NewSource(int64(5)))
-	m := make(map[int]int)
 	tree := New(testCmpInt)
-	for i := 0; i < searchTotal; i++ {
-		a := r.Intn(searchSpace)
-		m[a] = a
-		tree.Insert(a, a)
+	for i := 0; i < b.N; i++ {
+		tree.Insert((b.N - i), i)
 	}
 	b.StartTimer()
-	for i := 0; i < b.N; i++ {
+	/*for i := 0; i < b.N; i++ {
 		a := r.Intn(searchSpace)
-		tree.SearchRecurse(a)
+		tree.Remove(a)
+	}*/
+	for i := 0; i < b.N; i++ {
+		tree.Remove(i)
 	}
 }
+
 func BenchmarkIterInOrder(b *testing.B) {
 
 	b.StopTimer()
@@ -332,7 +354,6 @@ func BenchmarkIterInOrder(b *testing.B) {
 	}
 
 }
-
 func BenchmarkIterPreOrder(b *testing.B) {
 
 	b.StopTimer()
@@ -351,7 +372,6 @@ func BenchmarkIterPreOrder(b *testing.B) {
 	}
 
 }
-
 func BenchmarkIterPostOrder(b *testing.B) {
 
 	b.StopTimer()
@@ -371,14 +391,45 @@ func BenchmarkIterPostOrder(b *testing.B) {
 
 }
 
-func recurse() func(key interface{}, value interface{}) {
+func recurse() func(n *Node) {
 	var sum int = 0
-	return func(key interface{}, value interface{}) {
-		sum += value.(int)
+	return func(n *Node) {
+		sum += n.Value.(int)
 	}
 }
+func BenchmarkRecurseTraverseInorderOrder(b *testing.B) {
 
-func BenchmarkRecursePostOrder(b *testing.B) {
+	b.StopTimer()
+	r := rand.New(rand.NewSource(int64(5)))
+	tree := New(testCmpInt)
+	for i := 0; i < 1000; i++ {
+		tree.Insert(r.Int(), r.Int())
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		f := recurse()
+		tree.Traverse(InOrder, f)
+
+	}
+
+}
+func BenchmarkRecurseTraversePreorderOrder(b *testing.B) {
+
+	b.StopTimer()
+	r := rand.New(rand.NewSource(int64(5)))
+	tree := New(testCmpInt)
+	for i := 0; i < 1000; i++ {
+		tree.Insert(r.Int(), r.Int())
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		f := recurse()
+		tree.Traverse(PreOrder, f)
+
+	}
+
+}
+func BenchmarkRecurseTraversePostOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
@@ -393,107 +444,4 @@ func BenchmarkRecursePostOrder(b *testing.B) {
 
 	}
 
-}
-
-/* Experiments: not used */
-func (t *RBTree) insertIter(h *Node, key interface{}, value interface{}) *Node {
-
-	// empty tree
-	if h == nil {
-		return &Node{color: Red, Key: key, Value: value}
-	}
-
-	// setup our own stack and helpers
-	var (
-		stack     = []*Node{}
-		count int = 0
-		prior *Node
-	)
-
-L:
-	for {
-		switch t.cmp(h.Key, key) {
-		case EQ:
-			h.Value = value
-			return t.root // no need for rest of the fix code
-		case LT:
-			prior = h
-			stack = append(stack, prior)
-			count++
-			h = h.left
-			if h == nil {
-				h = &Node{color: Red, Key: key, Value: value}
-				prior.left = h
-				break L
-			}
-		case GT:
-			prior = h
-			stack = append(stack, prior)
-			count++
-			h = h.right
-			if h == nil {
-				h = &Node{color: Red, Key: key, Value: value}
-				prior.right = h
-				break L
-			}
-		default:
-			panic("Compare result undefined")
-		}
-
-		if prior == h {
-			panic("Shouldn't be equal last check")
-		}
-
-	}
-
-	// h is parent of new node at this point
-	h = prior
-L2:
-	for {
-		count--
-
-		if h.right.isRed() && !(h.left.isRed()) {
-			h = h.rotateLeft()
-		}
-		if h.left.isRed() && h.left.left.isRed() {
-			h = h.rotateRight()
-		}
-		if h.left.isRed() && h.right.isRed() {
-			h.colorFlip()
-		}
-
-		if count == 0 {
-			break L2
-		}
-
-		if count > 0 {
-
-			switch t.cmp(stack[count-1].Key, h.Key) {
-			case LT:
-				stack[count-1].left = h
-			case GT:
-				stack[count-1].right = h
-			}
-			h = stack[count-1]
-		}
-
-	}
-
-	return h
-}
-func (t *RBTree) TraverseIter(f IterFunc) {
-	node := t.root
-	stack := []*Node{nil}
-	for len(stack) != 1 || node != nil {
-		if node != nil {
-			stack = append(stack, node)
-			node = node.left
-		} else {
-			stackIndex := len(stack) - 1
-			node = stack[stackIndex]
-			f(node.Key, node.Value)
-			stack = stack[0:stackIndex]
-			node = node.right
-		}
-	}
 }
