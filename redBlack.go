@@ -25,12 +25,12 @@ func (c color) String() string {
 
 // Exports a key and value
 type Node struct {
-	Key, Value  interface{}
+	Elem        Comparable
 	left, right *Node
 	color       color
 }
 
-// internal
+// internal iterator
 type rbIter struct {
 	current *Node
 	stack   []*Node
@@ -45,29 +45,19 @@ type RBTree struct {
 	iter        rbIter
 	root        *Node
 	iterChan    chan *Node
-	cmp         CompareFunc
 }
 
-// creates a RBTree for use.
-// Must give it a compare function, see common.go for an example
-func New(cmp CompareFunc) *RBTree {
-	if cmp == nil {
-		panic("Must define a compare function")
-	}
-	return &RBTree{root: nil, first: nil, last: nil, Height: 0, cmp: cmp}
+func (t *RBTree) Min() Comparable {
+	return t.first.Elem
 }
 
-func (t *RBTree) Min() *Node {
-	return t.first
-}
-
-func (t *RBTree) Max() *Node {
-	return t.last
+func (t *RBTree) Max() Comparable {
+	return t.last.Elem
 }
 
 func (t *RBTree) Next() *Node {
 
-	n := t.iter.next()
+	n := t.iter.next() // func set by call to InitIter(TravOrder)
 	if n == nil {
 	}
 	return n
@@ -204,6 +194,143 @@ func (t *RBTree) Traverse(order TravOrder, f IterFunc) {
 
 }
 
+func (t *RBTree) Search(item Comparable) (found Comparable, ok bool) {
+	if item == nil {
+		return
+	}
+	x := t.root
+	for x != nil {
+		switch x.Elem.Compare(item) {
+		case EQ:
+			return x.Elem, true
+		case LT:
+			x = x.left
+		case GT:
+			x = x.right
+		default:
+			panic("Compare result of undefined")
+		}
+	}
+	return
+}
+
+func (t *RBTree) Insert(item Comparable) (old Comparable, ok bool) {
+	if item == nil {
+		return
+	}
+
+	if t.root == nil {
+		t.Size++
+		t.root = &Node{Elem: item, left: nil, right: nil}
+		t.first = t.root
+		t.last = t.root
+	} else {
+		t.root = t.insert(t.root, item)
+	}
+	if t.root.color == Red {
+		t.Height++
+	}
+	t.root.color = Black // maintain rb invariants
+	return
+}
+
+func (t *RBTree) insert(h *Node, item Comparable) *Node {
+	if h == nil {
+		t.Size++
+		// base case, insert do stuff on new node
+		n := &Node{Elem: item, left: nil, right: nil}
+		// set Min
+		switch t.first.Elem.Compare(item) {
+		case GT:
+			t.first = n
+		}
+		// set Max
+		switch t.last.Elem.Compare(item) {
+		case LT:
+			t.last = n
+		}
+		return n
+	}
+
+	switch h.Elem.Compare(item) {
+	case EQ:
+		h.Elem = item
+	case LT:
+		h.left = t.insert(h.left, item)
+	case GT:
+		h.right = t.insert(h.right, item)
+	default:
+		panic("Compare result of undefined")
+	}
+
+	if h.right.isRed() && !(h.left.isRed()) {
+		h = h.rotateLeft()
+	}
+	if h.left.isRed() && h.left.left.isRed() {
+		h = h.rotateRight()
+	}
+
+	if h.left.isRed() && h.right.isRed() {
+		h.colorFlip()
+	}
+	return h
+}
+
+func (t *RBTree) Remove(item Comparable) (ok bool) {
+	if item == nil {
+		return
+	}
+	if _, check := t.Search(item); !check {
+		return
+	}
+	t.root = t.remove(t.root, item)
+	if t.root != nil && t.root.color == Red {
+		t.root.color = Black // maintain rb invariants
+		t.Height--
+	} else if t.root == nil {
+		t.Height--
+	}
+	return true
+
+}
+
+func (t *RBTree) remove(h *Node, item Comparable) *Node {
+
+	switch h.Elem.Compare(item) {
+	case LT:
+		if h.left != nil {
+			if !h.left.isRed() && !(h.left.left.isRed()) {
+				h = h.moveRedLeft()
+			}
+			h.left = t.remove(h.left, item)
+		}
+	default:
+		if h.left.isRed() {
+			h = h.rotateRight()
+		}
+		if result := h.Elem.Compare(item); result == EQ && h.right == nil {
+			t.Size--
+			return nil
+		}
+
+		if h.right != nil {
+			if !h.right.isRed() && !(h.right.left.isRed()) {
+				h = h.moveRedRight()
+			}
+			if result := h.Elem.Compare(item); result == EQ {
+				t.Size--
+				x := h.right.min()
+				h.Elem = x.Elem
+				h.right = h.right.removeMin()
+			} else {
+				h.right = t.remove(h.right, item)
+			}
+		}
+	}
+	return h.fixUp()
+}
+
+// Left Leaning Red Black Tree functions and helpers to maintain public methods
 func (h *Node) rotateLeft() (x *Node) {
 	x = h.right
 	h.right = x.left
@@ -222,93 +349,10 @@ func (h *Node) rotateRight() (x *Node) {
 	return
 }
 
-func (t *RBTree) Search(key interface{}) (value interface{}, ok bool) {
-	if key == nil {
-		return
-	}
-	x := t.root
-	for x != nil {
-
-		switch t.cmp(x.Key, key) {
-		case EQ:
-			return x.Value, true
-		case LT:
-			x = x.left
-		case GT:
-			x = x.right
-		default:
-			panic("Compare result of undefined")
-		}
-	}
-	return
-}
-
-func (t *RBTree) Insert(key interface{}, value interface{}) (old interface{}, ok bool) {
-	if key == nil {
-		return
-	}
-
-	if t.root == nil {
-		t.Size++
-		t.root = &Node{color: Red, Key: key, Value: value, left: nil, right: nil}
-		t.first = t.root
-		t.last = t.root
-	} else {
-		t.root = t.insert(t.root, key, value)
-		//t.root = t.insertIter(t.root, key, value)
-	}
-	if t.root.color == Red {
-		t.Height++
-	}
-	t.root.color = Black // maintain rb invariants
-	return
-}
-
-func (t *RBTree) insert(h *Node, key interface{}, value interface{}) *Node {
-	if h == nil {
-		t.Size++
-		// base case, insert do stuff on new node
-		n := &Node{color: Red, Key: key, Value: value}
-		// set Min
-		switch t.cmp(t.first.Key, key) {
-		case GT:
-			t.first = n
-		}
-		// set Max
-		switch t.cmp(t.last.Key, key) {
-		case LT:
-			t.last = n
-		}
-		return n
-	}
-
-	switch t.cmp(h.Key, key) {
-	case EQ:
-		h.Value = value
-	case LT:
-		h.left = t.insert(h.left, key, value)
-	case GT:
-		h.right = t.insert(h.right, key, value)
-	default:
-		panic("Compare result of undefined")
-	}
-
-	if h.right.isRed() && !(h.left.isRed()) {
-		h = h.rotateLeft()
-	}
-	if h.left.isRed() && h.left.left.isRed() {
-		h = h.rotateRight()
-	}
-
-	if h.left.isRed() && h.right.isRed() {
-		h.colorFlip()
-	}
-	return h
-}
-
 func (h *Node) isRed() bool {
 	return h != nil && h.color == Red
 }
+
 func (h *Node) moveRedLeft() *Node {
 	h.colorFlip()
 	if h.right.left.isRed() {
@@ -321,6 +365,7 @@ func (h *Node) moveRedLeft() *Node {
 	}
 	return h
 }
+
 func (h *Node) moveRedRight() *Node {
 	h.colorFlip()
 	if h.left.left.isRed() {
@@ -336,20 +381,6 @@ func (h *Node) colorFlip() {
 	h.right.color = !h.right.color
 }
 
-func (h *Node) removeMin() *Node {
-	if h == nil {
-		panic("WE GOT A NIL")
-	}
-	if h.left == nil {
-		return nil
-	}
-	if !h.left.isRed() && !h.left.left.isRed() {
-		h = h.moveRedLeft()
-	}
-
-	h.left = h.left.removeMin()
-	return h.fixUp()
-}
 func (h *Node) fixUp() *Node {
 	//fmt.Println("#1", h)
 	/*if h.right.isRed() && !h.left.isRed() {
@@ -378,57 +409,18 @@ func (h *Node) min() *Node {
 	return h
 }
 
-func (t *RBTree) Remove(key interface{}) (ok bool) {
-	if key == nil {
-		return
+func (h *Node) removeMin() *Node {
+	if h == nil {
+		panic("WE GOT A NIL")
 	}
-	if _, check := t.Search(key); !check {
-		return
+	if h.left == nil {
+		return nil
 	}
-	t.root = t.remove(t.root, key)
-	if t.root != nil && t.root.color == Red {
-		t.root.color = Black // maintain rb invariants
-		t.Height--
-	} else if t.root == nil {
-		t.Height--
+	if !h.left.isRed() && !h.left.left.isRed() {
+		h = h.moveRedLeft()
 	}
-	return true
 
-}
+	h.left = h.left.removeMin()
 
-func (t *RBTree) remove(h *Node, key interface{}) *Node {
-
-	switch t.cmp(h.Key, key) {
-	case LT:
-		if h.left != nil {
-			if !h.left.isRed() && !(h.left.left.isRed()) {
-				h = h.moveRedLeft()
-			}
-			h.left = t.remove(h.left, key)
-		}
-	default:
-		if h.left.isRed() {
-			h = h.rotateRight()
-		}
-		if result := t.cmp(h.Key, key); result == EQ && h.right == nil {
-			t.Size--
-			return nil
-		}
-
-		if h.right != nil {
-			if !h.right.isRed() && !(h.right.left.isRed()) {
-				h = h.moveRedRight()
-			}
-			if result := t.cmp(h.Key, key); result == EQ {
-				t.Size--
-				x := h.right.min()
-				h.Key = x.Key
-				h.Value = x.Value
-				h.right = h.right.removeMin()
-			} else {
-				h.right = t.remove(h.right, key)
-			}
-		}
-	}
 	return h.fixUp()
 }

@@ -1,10 +1,11 @@
 package gotree
 
+/* Experiments: not used */
+/*
 import (
 	"fmt"
 )
 
-/* Experiments: not used */
 
 func (t *RBTree) searchRecurse(key interface{}) (value interface{}, ok bool) {
 
@@ -170,6 +171,7 @@ L2:
 
 	return h
 }
+*/
 
 // Experinmental
 /*

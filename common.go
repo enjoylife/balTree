@@ -53,27 +53,6 @@ func (d Balance) String() string {
 	return s
 }
 
-/*
-Needed function to determine insertion order, and compare our stored types equality. Param a and param b are keys of nodes within a tree.
-We compare the first param to the second, so if first param is bigger then GT, if equal EQ, etc.
-
-EX:
-    func testCmp(a interface{}, b interface{}) gotree.Balance {
-        // we assume we are handling int's
-        switch result := (a.(int) - b.(int)); {
-        case result > 0:
-            return gotree.LT
-        case result < 0:
-            return gotree.GT
-        case result == 0:
-            return gotree.EQ
-        default:
-            panic("Invalid Compare function Result")
-        }
-    }
-*/
-type CompareFunc func(interface{}, interface{}) Balance
-
 // A Comparable is a type that can be inserted into a Tree or used as a range
 // or equality query on the tree,
 type Comparable interface {
@@ -83,15 +62,9 @@ type Comparable interface {
 /*
 Our function we can give to our iterators to work with our stored types.
 EX:
-    func printNode(key interface{}, value interface{}) {
+    func printNode(item Comparable}) {
         fmt.Printf("keyType: %T, valueType: %T \n", key, value)
     }
 */
-type IterFunc func(*Node)
 
-type TreeNode interface {
-	Key() interface{}
-	Value() interface{}
-	leftChild() *TreeNode
-	lightChild() *TreeNode
-}
+type IterFunc func(*Node)

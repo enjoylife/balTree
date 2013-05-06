@@ -8,8 +8,6 @@ import (
 )
 
 func init() {
-	// so that every run is the same seq of rand numbers
-	rand.Seed(0)
 }
 
 var _ = spew.Dump
@@ -21,11 +19,11 @@ const (
 	searchSpace = searchTotal / 2
 )
 
-type ExInt int
+type exInt int
 
-func (this ExInt) Compare(b Comparable) Balance {
+func (this exInt) Compare(b Comparable) Balance {
 	switch that := b.(type) {
-	case ExInt:
+	case exInt:
 		switch result := int(this - that); {
 		case result > 0:
 			return LT
@@ -42,6 +40,42 @@ func (this ExInt) Compare(b Comparable) Balance {
 		panic(s)
 	}
 
+}
+
+type exString string
+
+func (this exString) Compare(b Comparable) Balance {
+	switch that := b.(type) {
+	case exString:
+		a := string(this)
+		b := string(that)
+		min := len(b)
+		if len(a) < len(b) {
+			min = len(a)
+		}
+		diff := 0
+		for i := 0; i < min && diff == 0; i++ {
+			diff = int(a[i]) - int(b[i])
+		}
+		if diff == 0 {
+			diff = len(a) - len(b)
+		}
+
+		switch result := diff; {
+		case result > 0:
+			return LT
+		case result < 0:
+			return GT
+		case result == 0:
+			return EQ
+		default:
+			panic("Invalid Compare function Result")
+		}
+
+	default:
+		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
+		panic(s)
+	}
 }
 
 /* Testing Compare function: int */
@@ -87,9 +121,9 @@ func testCmpString(c interface{}, d interface{}) Balance {
 }
 
 /* Helpers for tree traversal and testing tree properties */
-
 func printNode(n *Node) {
-	fmt.Println("VALUE: ", n.Value)
+	x := n.Elem
+	fmt.Println("Elem:", x)
 }
 
 func isBalanced(t *RBTree) bool {
@@ -121,11 +155,11 @@ func nodeIsBalanced(n *Node, black int) bool {
 func inc(t *testing.T) func(n *Node) {
 	var prior int = -1
 	return func(n *Node) {
-		if prior < n.Value.(int) {
+		if prior < int(n.Elem.(exInt)) {
 			//fmt.Println("VALUE: ", value.(int))
-			prior = n.Value.(int)
+			prior = int(n.Elem.(exInt))
 		} else {
-			t.Errorf("Prior: %d, Current: %d", prior, n.Value.(int))
+			t.Errorf("Prior: %d, Current: %d", prior, n.Elem)
 		}
 	}
 }
@@ -133,11 +167,11 @@ func inc(t *testing.T) func(n *Node) {
 func TestInsert(t *testing.T) {
 
 	r := rand.New(rand.NewSource(int64(5)))
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	iters := 10000
 	for i := 0; i < iters; i++ {
 		item := r.Int()
-		tree.Insert(item, item)
+		tree.Insert(exInt(item))
 	}
 	if !isBalanced(tree) {
 		t.Errorf("Tree is not balanced")
@@ -147,10 +181,10 @@ func TestInsert(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	iters := 10000
 	for i := 0; i < iters; i++ {
-		tree.Insert(i, i)
+		tree.Insert(exInt(i))
 	}
 	_, ok := tree.Search(nil)
 	if ok {
@@ -159,17 +193,17 @@ func TestSearch(t *testing.T) {
 
 	tree.Traverse(InOrder, inc(t))
 	for i := 0; i < iters; i++ {
-		value, ok := tree.Search(i)
+		value, ok := tree.Search(exInt(i))
 		if !ok {
 			t.Errorf("All these values should be present")
 		}
-		if value != i {
+		if int(value.(exInt)) != i {
 			t.Errorf("Values don't match Exp: %d, Got: %d", i, value)
 		}
 	}
 
 	for i := iters; i < iters*2; i++ {
-		value, ok := tree.Search(i)
+		value, ok := tree.Search(exInt(i))
 		if ok {
 			t.Errorf("values should not be present")
 		}
@@ -181,14 +215,14 @@ func TestSearch(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	iters := 1000
 	for i := 0; i < iters; i++ {
-		tree.Insert(i, i)
+		tree.Insert(exInt(i))
 	}
 
 	for i := 0; i < iters; i++ {
-		tree.Remove(i)
+		tree.Remove(exInt(i))
 
 		black := 0
 		for x := tree.root; x != nil; x = x.left {
@@ -208,12 +242,12 @@ func TestRemove(t *testing.T) {
 
 func TestIterIn(t *testing.T) {
 
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
 	preOrder := []string{"d", "b", "a", "c", "h", "f", "e", "g", "i"}
 	postOrder := []string{"a", "c", "b", "e", "g", "f", "i", "h", "d"}
-	for i, v := range items {
-		tree.Insert(i, v)
+	for _, v := range items {
+		tree.Insert(exString(v))
 	}
 	if !isBalanced(tree) {
 		t.Errorf("Tree is not balanced")
@@ -224,8 +258,8 @@ func TestIterIn(t *testing.T) {
 	for i, n := 0, tree.InitIter(InOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if items[i] != n.Value {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, items[i])
+		if items[i] != string(n.Elem.(exString)) {
+			t.Errorf("Elems are in wrong order Got:%s, Exp: %s", n.Elem, items[i])
 		}
 
 	}
@@ -236,8 +270,8 @@ func TestIterIn(t *testing.T) {
 	for i, n := 0, tree.InitIter(PreOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if preOrder[i] != n.Value {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, preOrder[i])
+		if preOrder[i] != string(n.Elem.(exString)) {
+			t.Errorf("Elems are in wrong order Got:%s, Exp: %s", n.Elem, preOrder[i])
 		}
 
 	}
@@ -248,8 +282,8 @@ func TestIterIn(t *testing.T) {
 	for i, n := 0, tree.InitIter(PostOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
-		if postOrder[i] != n.Value {
-			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Value, postOrder[i])
+		if postOrder[i] != string(n.Elem.(exString)) {
+			t.Errorf("Values are in wrong order Got:%s, Exp: %s", n.Elem, postOrder[i])
 		}
 
 	}
@@ -265,15 +299,15 @@ func TestIterIn(t *testing.T) {
 
 func TestTraversal(t *testing.T) {
 
-	tree := New(testCmpString)
+	tree := &RBTree{}
 	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
 	for _, v := range items {
-		tree.Insert(v, v)
+		tree.Insert(exString(v))
 	}
 	if !isBalanced(tree) {
 		t.Errorf("Tree is not balanced")
 	}
-	//tree.Traverse(InOrder, printNode)
+	tree.Traverse(InOrder, printNode)
 
 }
 
@@ -293,12 +327,10 @@ func BenchmarkMapInsert(b *testing.B) {
 func BenchmarkInsert(b *testing.B) {
 
 	b.StopTimer()
-	r := rand.New(rand.NewSource(int64(5)))
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		a := r.Int()
-		tree.Insert(a, a)
+		tree.Insert(exInt(i))
 	}
 }
 func BenchmarkSearch(b *testing.B) {
@@ -306,25 +338,26 @@ func BenchmarkSearch(b *testing.B) {
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
 	m := make(map[int]int)
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	for i := 0; i < searchTotal; i++ {
 		a := r.Intn(searchSpace)
 		m[a] = a
-		tree.Insert(a, a)
+		tree.Insert(exInt(a))
+		//tree.Insert(a, a)
 	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		a := r.Intn(searchSpace)
-		tree.Search(a)
+		tree.Search(exInt(a))
 	}
 }
 
 func BenchmarkRemove(b *testing.B) {
 
 	b.StopTimer()
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	for i := 0; i < b.N; i++ {
-		tree.Insert((b.N - i), i)
+		tree.Insert(exInt(b.N - i))
 	}
 	b.StartTimer()
 	/*for i := 0; i < b.N; i++ {
@@ -332,7 +365,7 @@ func BenchmarkRemove(b *testing.B) {
 		tree.Remove(a)
 	}*/
 	for i := 0; i < b.N; i++ {
-		tree.Remove(i)
+		tree.Remove(exInt(i))
 	}
 }
 
@@ -340,16 +373,16 @@ func BenchmarkIterInOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	for i := 0; i < 1000; i++ {
-		tree.Insert(r.Int(), r.Int())
+		tree.Insert(exInt(r.Int()))
 	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		sum := 0
 
 		for i, n := 0, tree.InitIter(InOrder); n != nil; i, n = i+1, tree.Next() {
-			sum += n.Value.(int)
+			sum += int(n.Elem.(exInt))
 		}
 	}
 
@@ -358,16 +391,16 @@ func BenchmarkIterPreOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	for i := 0; i < 1000; i++ {
-		tree.Insert(r.Int(), r.Int())
+		tree.Insert(exInt(r.Int()))
 	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		sum := 0
 
 		for i, n := 0, tree.InitIter(PreOrder); n != nil; i, n = i+1, tree.Next() {
-			sum += n.Value.(int)
+			sum += int(n.Elem.(exInt))
 		}
 	}
 
@@ -376,16 +409,16 @@ func BenchmarkIterPostOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	for i := 0; i < 1000; i++ {
-		tree.Insert(r.Int(), r.Int())
+		tree.Insert(exInt(r.Int()))
 	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		sum := 0
 
 		for i, n := 0, tree.InitIter(PostOrder); n != nil; i, n = i+1, tree.Next() {
-			sum += n.Value.(int)
+			sum += int(n.Elem.(exInt))
 		}
 	}
 
@@ -394,16 +427,16 @@ func BenchmarkIterPostOrder(b *testing.B) {
 func recurse() func(n *Node) {
 	var sum int = 0
 	return func(n *Node) {
-		sum += n.Value.(int)
+		sum += int(n.Elem.(exInt))
 	}
 }
 func BenchmarkRecurseTraverseInorderOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	for i := 0; i < 1000; i++ {
-		tree.Insert(r.Int(), r.Int())
+		tree.Insert(exInt(r.Int()))
 	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -417,9 +450,9 @@ func BenchmarkRecurseTraversePreorderOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	for i := 0; i < 1000; i++ {
-		tree.Insert(r.Int(), r.Int())
+		tree.Insert(exInt(r.Int()))
 	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -433,9 +466,9 @@ func BenchmarkRecurseTraversePostOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
-	tree := New(testCmpInt)
+	tree := &RBTree{}
 	for i := 0; i < 1000; i++ {
-		tree.Insert(r.Int(), r.Int())
+		tree.Insert(exInt(r.Int()))
 	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
