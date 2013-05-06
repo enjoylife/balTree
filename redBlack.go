@@ -4,14 +4,15 @@ import (
 	"fmt"
 )
 
+// Color is the used to maintain the redblack tree balance.
 type color bool
 
 const (
-	Red   color = false //default
+	Red   color = false // we rely on default for node initializations
 	Black color = true
 )
 
-// Pretty output for errors, debuging, etc.
+// Pretty output for errors, debugging, etc.
 func (c color) String() string {
 	var s string
 	switch c {
@@ -23,38 +24,58 @@ func (c color) String() string {
 	return s
 }
 
-// Exports a key and value
+// A Node is the type manipulated within the tree. It holds the inserted elements.
+// It is exposed whenever the tree traversal functions are used.
 type Node struct {
-	Elem        Comparable
+	Elem Comparer
+	//
 	left, right *Node
 	color       color
 }
 
-// internal iterator
+// rbIter is used to hold our state for iterative tree traversal methods.
 type rbIter struct {
 	current *Node
 	stack   []*Node
 	next    func() *Node
 }
 
-// Exports a Height, Size, and
+// A RBTree is our main type our redblack tree methods are defined on.
 type RBTree struct {
-	Height      int
-	Size        int
+	Height      int // Height from root to leaf
+	Size        int // Number of inserted elements
 	first, last *Node
-	iter        rbIter
+	iter        rbIter // initially ni
 	root        *Node
-	iterChan    chan *Node
 }
 
-func (t *RBTree) Min() Comparable {
-	return t.first.Elem
+// Min returns the smallest inserted element if possible. If the smallest value is not
+// found(empty tree), then Min returns a nil.
+func (t *RBTree) Min() Comparer {
+	if t.first != nil {
+		return t.first.Elem
+	}
+	return nil
 }
 
-func (t *RBTree) Max() Comparable {
-	return t.last.Elem
+// Max returns the largest inserted element if possible. If the largest value is not
+// found(empty tree), then Max returns a nil.
+func (t *RBTree) Max() Comparer {
+	if t.last != nil {
+		return t.last.Elem
+	}
+	return nil
 }
 
+// Next is called when individual elements are wanted to be traversed over.
+// Prior to a call to Next, a call to InitIter needs to be made to set up the necessary
+// data to allow for traversal of the tree. Example:
+//
+//      // (exInt is simple int type)
+//  	sum := 0
+//  	for i, n := 0, tree.InitIter(PreOrder); n != nil; i, n = i+1, tree.Next() {
+//  		sum += int(n.Elem.(exInt)) + i
+//  	}
 func (t *RBTree) Next() *Node {
 
 	n := t.iter.next() // func set by call to InitIter(TravOrder)
@@ -64,7 +85,10 @@ func (t *RBTree) Next() *Node {
 
 }
 
+// InitIter is the initializer which setups the tree for iterating over it's elements in
+// a specific order. It setups the internal data, and then returns the first Node to be looked at. See Next for an example.
 func (t *RBTree) InitIter(order TravOrder) *Node {
+
 	current := t.root
 	stack := []*Node{}
 	switch order {
@@ -150,6 +174,12 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 
 }
 
+// Traverse is a more performance orientated way to iterate over the elements of the tree.
+// Given a TravOrder and a function which conforms to the IterFunc type:
+//
+//      type IterFunc func(*Node)
+//
+// Traverse calls the function for each Node  in the specified order.
 func (t *RBTree) Traverse(order TravOrder, f IterFunc) {
 
 	n := t.root
@@ -194,38 +224,45 @@ func (t *RBTree) Traverse(order TravOrder, f IterFunc) {
 
 }
 
-func (t *RBTree) Search(item Comparable) (found Comparable, ok bool) {
+// Search takes as input any type implementing the Comparer interface and returns either:
+// a matching Comparer element as based upon their Compare function, and a true, or
+// a nil and a false.
+func (t *RBTree) Search(item Comparer) (found Comparer, ok bool) {
 	if item == nil {
-		return
+		return nil, false
 	}
 	x := t.root
 	for x != nil {
 		switch x.Elem.Compare(item) {
+		case GT:
+			x = x.left
+		case LT:
+			x = x.right
 		case EQ:
 			return x.Elem, true
-		case LT:
-			x = x.left
-		case GT:
-			x = x.right
 		default:
 			panic("Compare result of undefined")
 		}
 	}
-	return
+	return nil, false
 }
 
-func (t *RBTree) Insert(item Comparable) (old Comparable, ok bool) {
+// Insert takes a type implementing the Comparer interface, this type is then inserted into the
+// tree. If there was a previous entry at the same insertion point as the item to be inserted,
+// the old element is returned.
+func (t *RBTree) Insert(item Comparer) (old Comparer, ok bool) {
 	if item == nil {
-		return
+		return nil, false
 	}
 
+	ok = true
 	if t.root == nil {
 		t.Size++
 		t.root = &Node{Elem: item, left: nil, right: nil}
 		t.first = t.root
 		t.last = t.root
 	} else {
-		t.root = t.insert(t.root, item)
+		t.root, old = t.insert(t.root, item)
 	}
 	if t.root.color == Red {
 		t.Height++
@@ -234,7 +271,7 @@ func (t *RBTree) Insert(item Comparable) (old Comparable, ok bool) {
 	return
 }
 
-func (t *RBTree) insert(h *Node, item Comparable) *Node {
+func (t *RBTree) insert(h *Node, item Comparer) (root *Node, old Comparer) {
 	if h == nil {
 		t.Size++
 		// base case, insert do stuff on new node
@@ -249,16 +286,17 @@ func (t *RBTree) insert(h *Node, item Comparable) *Node {
 		case LT:
 			t.last = n
 		}
-		return n
+		return n, nil
 	}
 
 	switch h.Elem.Compare(item) {
-	case EQ:
-		h.Elem = item
-	case LT:
-		h.left = t.insert(h.left, item)
 	case GT:
-		h.right = t.insert(h.right, item)
+		h.left, old = t.insert(h.left, item)
+	case LT:
+		h.right, old = t.insert(h.right, item)
+	case EQ:
+		old = h.Elem
+		h.Elem = item
 	default:
 		panic("Compare result of undefined")
 	}
@@ -273,10 +311,10 @@ func (t *RBTree) insert(h *Node, item Comparable) *Node {
 	if h.left.isRed() && h.right.isRed() {
 		h.colorFlip()
 	}
-	return h
+	return h, old
 }
 
-func (t *RBTree) Remove(item Comparable) (ok bool) {
+func (t *RBTree) Remove(item Comparer) (ok bool) {
 	if item == nil {
 		return
 	}
@@ -294,10 +332,10 @@ func (t *RBTree) Remove(item Comparable) (ok bool) {
 
 }
 
-func (t *RBTree) remove(h *Node, item Comparable) *Node {
+func (t *RBTree) remove(h *Node, item Comparer) *Node {
 
 	switch h.Elem.Compare(item) {
-	case LT:
+	case GT:
 		if h.left != nil {
 			if !h.left.isRed() && !(h.left.left.isRed()) {
 				h = h.moveRedLeft()
@@ -331,6 +369,7 @@ func (t *RBTree) remove(h *Node, item Comparable) *Node {
 }
 
 // Left Leaning Red Black Tree functions and helpers to maintain public methods
+
 func (h *Node) rotateLeft() (x *Node) {
 	x = h.right
 	h.right = x.left
@@ -359,9 +398,6 @@ func (h *Node) moveRedLeft() *Node {
 		h.right = h.right.rotateRight()
 		h = h.rotateLeft()
 		h.colorFlip()
-		/*if h.right.right.isRed() {
-			h.right = h.right.rotateLeft()
-		}*/
 	}
 	return h
 }
@@ -382,20 +418,13 @@ func (h *Node) colorFlip() {
 }
 
 func (h *Node) fixUp() *Node {
-	//fmt.Println("#1", h)
-	/*if h.right.isRed() && !h.left.isRed() {
-		h = h.rotateLeft()
-	}*/
 	if h.right.isRed() {
 		h = h.rotateLeft()
 	}
 
-	//fmt.Println("#2", h)
-
 	if h.left.isRed() && h.left.left.isRed() {
 		h = h.rotateRight()
 	}
-	//fmt.Println("#3", h)
 	if h.left.isRed() && h.right.isRed() {
 		h.colorFlip()
 	}
@@ -410,9 +439,6 @@ func (h *Node) min() *Node {
 }
 
 func (h *Node) removeMin() *Node {
-	if h == nil {
-		panic("WE GOT A NIL")
-	}
 	if h.left == nil {
 		return nil
 	}

@@ -4,10 +4,10 @@ package gotree
 type TravOrder int
 
 const (
-	PreOrder TravOrder = iota
-	PostOrder
-	InOrder
-	LevelOrder
+	InOrder    TravOrder = iota // a,b,c,d,e,f,g,h,i
+	PreOrder                    // d,b,a,c,h,f,e,g,i
+	PostOrder                   // a,c,b,e,g,f,i,h,d
+	LevelOrder                  // dependent on tree state
 )
 
 // implement the String interface for human readable names of traversal ablities
@@ -53,17 +53,35 @@ func (d Balance) String() string {
 	return s
 }
 
-// A Comparable is a type that can be inserted into a Tree or used as a range
-// or equality query on the tree,
-type Comparable interface {
-	Compare(Comparable) Balance
+// Comparer is a one method interface type.
+// Types which implement a Compare method can be inserted into a Tree.
+// Compare returns a Balance with respect to the total order between the method calle and its given
+// arguement.
+// Given:
+//
+//      bal = calle.Compare(arg):
+//
+// The result of bal should follow this logic:
+//
+//      if calle < arg {
+//          bal == LT
+//      }
+//      if calle > arg {
+//          bal == GT
+//      }
+//      if calle == arg {
+//          bal == EQ
+//      }
+// Think of Compare as asking the question, "what is the calle's relationship to arg?"
+type Comparer interface {
+	Compare(Comparer) Balance
 }
 
 /*
 Our function we can give to our iterators to work with our stored types.
 EX:
-    func printNode(item Comparable}) {
-        fmt.Printf("keyType: %T, valueType: %T \n", key, value)
+    func printNode(n *Node}) {
+        fmt.Printf("ElementType: %T, ElementValue: %v\n", n.Elem,n.Elem)
     }
 */
 

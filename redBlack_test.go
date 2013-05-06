@@ -17,18 +17,19 @@ var _ = fmt.Printf
 const (
 	searchTotal = 100000
 	searchSpace = searchTotal / 2
+	iters       = 10000
 )
 
 type exInt int
 
-func (this exInt) Compare(b Comparable) Balance {
+func (this exInt) Compare(b Comparer) Balance {
 	switch that := b.(type) {
 	case exInt:
 		switch result := int(this - that); {
 		case result > 0:
-			return LT
-		case result < 0:
 			return GT
+		case result < 0:
+			return LT
 		case result == 0:
 			return EQ
 		default:
@@ -44,7 +45,7 @@ func (this exInt) Compare(b Comparable) Balance {
 
 type exString string
 
-func (this exString) Compare(b Comparable) Balance {
+func (this exString) Compare(b Comparer) Balance {
 	switch that := b.(type) {
 	case exString:
 		a := string(this)
@@ -63,9 +64,9 @@ func (this exString) Compare(b Comparable) Balance {
 
 		switch result := diff; {
 		case result > 0:
-			return LT
-		case result < 0:
 			return GT
+		case result < 0:
+			return LT
 		case result == 0:
 			return EQ
 		default:
@@ -78,45 +79,27 @@ func (this exString) Compare(b Comparable) Balance {
 	}
 }
 
-/* Testing Compare function: int */
-func testCmpInt(a interface{}, b interface{}) Balance {
-	switch result := (a.(int) - b.(int)); {
-	case result > 0:
-		return LT
-	case result < 0:
-		return GT
-	case result == 0:
-		return EQ
-	default:
-		panic("Invalid Compare function Result")
-	}
+type exStruct struct {
+	M int
+	S string
 }
 
-/* Testing Compare function: string */
-func testCmpString(c interface{}, d interface{}) Balance {
-	a := c.(string)
-	b := d.(string)
-	min := len(b)
-	if len(a) < len(b) {
-		min = len(a)
-	}
-	diff := 0
-	for i := 0; i < min && diff == 0; i++ {
-		diff = int(a[i]) - int(b[i])
-	}
-	if diff == 0 {
-		diff = len(a) - len(b)
-	}
-
-	switch result := diff; {
-	case result > 0:
-		return LT
-	case result < 0:
-		return GT
-	case result == 0:
-		return EQ
+func (this exStruct) Compare(b Comparer) Balance {
+	switch that := b.(type) {
+	case exStruct:
+		switch result := int(this.M - that.M); {
+		case result > 0:
+			return GT
+		case result < 0:
+			return LT
+		case result == 0:
+			return EQ
+		default:
+			panic("Invalid Compare function Result")
+		}
 	default:
-		panic("Invalid Compare function Result")
+		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
+		panic(s)
 	}
 }
 
@@ -152,6 +135,7 @@ func nodeIsBalanced(n *Node, black int) bool {
 	return nodeIsBalanced(n.left, black) && nodeIsBalanced(n.right, black)
 }
 
+// can only be used for exInt
 func inc(t *testing.T) func(n *Node) {
 	var prior int = -1
 	return func(n *Node) {
@@ -163,12 +147,60 @@ func inc(t *testing.T) func(n *Node) {
 		}
 	}
 }
+func TestBasicInsert(t *testing.T) {
 
-func TestInsert(t *testing.T) {
+	var old Comparer
+	var check bool
+	items := []exStruct{exStruct{0, "0"},
+		exStruct{2, "2"}, exStruct{2, "3"}}
+	tree := &RBTree{}
+	old, check = tree.Insert(nil)
+	if old != nil || check {
+		t.Errorf("Should Not be able to input nil")
+	}
+
+	if tree.Min() != nil {
+		fmt.Println(tree.Min())
+		t.Errorf("Min not working")
+	}
+	if tree.Max() != nil {
+		fmt.Println(tree.Max())
+		t.Errorf("Max not working")
+	}
+	old, check = tree.Insert(items[0])
+	if !check || old != nil {
+		t.Errorf("First check on input is messed!")
+	}
+
+	tree.Insert(items[1])
+	old, check = tree.Insert(items[2])
+	if !check {
+		t.Errorf("Check on old input is messed!")
+	}
+	if old != items[1] {
+		t.Errorf("old input is messed!")
+	}
+	old, check = tree.Insert(items[1])
+	if !check {
+		t.Errorf("Check on old input is messed!")
+	}
+	if old != items[2] {
+		t.Errorf("old input is messed!")
+	}
+	if tree.Min() != items[0] {
+		fmt.Println(tree.Min())
+		t.Errorf("Min not working")
+	}
+	if tree.Max() != items[1] {
+		fmt.Println(tree.Max())
+		t.Errorf("Max not working")
+	}
+}
+
+func TestMoreInsert(t *testing.T) {
 
 	r := rand.New(rand.NewSource(int64(5)))
 	tree := &RBTree{}
-	iters := 10000
 	for i := 0; i < iters; i++ {
 		item := r.Int()
 		tree.Insert(exInt(item))
@@ -182,7 +214,6 @@ func TestInsert(t *testing.T) {
 func TestSearch(t *testing.T) {
 
 	tree := &RBTree{}
-	iters := 10000
 	for i := 0; i < iters; i++ {
 		tree.Insert(exInt(i))
 	}
@@ -216,7 +247,6 @@ func TestSearch(t *testing.T) {
 func TestRemove(t *testing.T) {
 
 	tree := &RBTree{}
-	iters := 1000
 	for i := 0; i < iters; i++ {
 		tree.Insert(exInt(i))
 	}
