@@ -33,10 +33,10 @@ func (this exInt) Compare(b Comparer) Balance {
 		case result == 0:
 			return EQ
 		default:
-			panic("Invalid Compare function Result")
+			return NP
 		}
-
 	default:
+		return NP
 		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
 		panic(s)
 	}
@@ -70,10 +70,11 @@ func (this exString) Compare(b Comparer) Balance {
 		case result == 0:
 			return EQ
 		default:
-			panic("Invalid Compare function Result")
+			return NP
 		}
 
 	default:
+		return NP
 		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
 		panic(s)
 	}
@@ -95,9 +96,10 @@ func (this exStruct) Compare(b Comparer) Balance {
 		case result == 0:
 			return EQ
 		default:
-			panic("Invalid Compare function Result")
+			return NP
 		}
 	default:
+		return NP
 		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
 		panic(s)
 	}
@@ -150,12 +152,12 @@ func inc(t *testing.T) func(n *Node) {
 func TestBasicInsert(t *testing.T) {
 
 	var old Comparer
-	var check bool
+	var check error
 	items := []exStruct{exStruct{0, "0"},
 		exStruct{2, "2"}, exStruct{2, "3"}}
 	tree := &RBTree{}
 	old, check = tree.Insert(nil)
-	if old != nil || check {
+	if old != nil || check == nil {
 		t.Errorf("Should Not be able to input nil")
 	}
 
@@ -168,20 +170,20 @@ func TestBasicInsert(t *testing.T) {
 		t.Errorf("Max not working")
 	}
 	old, check = tree.Insert(items[0])
-	if !check || old != nil {
+	if check != nil || old != nil {
 		t.Errorf("First check on input is messed!")
 	}
 
 	tree.Insert(items[1])
 	old, check = tree.Insert(items[2])
-	if !check {
+	if check != nil {
 		t.Errorf("Check on old input is messed!")
 	}
 	if old != items[1] {
 		t.Errorf("old input is messed!")
 	}
 	old, check = tree.Insert(items[1])
-	if !check {
+	if check != nil {
 		t.Errorf("Check on old input is messed!")
 	}
 	if old != items[2] {
@@ -218,14 +220,14 @@ func TestSearch(t *testing.T) {
 		tree.Insert(exInt(i))
 	}
 	_, ok := tree.Search(nil)
-	if ok {
+	if ok == nil {
 		t.Errorf("Not minding nil key's")
 	}
 
 	tree.Traverse(InOrder, inc(t))
 	for i := 0; i < iters; i++ {
 		value, ok := tree.Search(exInt(i))
-		if !ok {
+		if ok != nil {
 			t.Errorf("All these values should be present")
 		}
 		if int(value.(exInt)) != i {
@@ -235,7 +237,7 @@ func TestSearch(t *testing.T) {
 
 	for i := iters; i < iters*2; i++ {
 		value, ok := tree.Search(exInt(i))
-		if ok {
+		if ok != nil {
 			t.Errorf("values should not be present")
 		}
 		if value != nil {

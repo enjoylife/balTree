@@ -1,5 +1,9 @@
 package gotree
 
+import (
+	"fmt"
+)
+
 // Our possible tree traversal ablitites
 type TravOrder int
 
@@ -36,6 +40,7 @@ const (
 	GT Balance = iota
 	EQ
 	LT
+	NP
 )
 
 // human readable representation of Balance values
@@ -49,6 +54,8 @@ func (d Balance) String() string {
 		s = "equal to"
 	case LT:
 		s = "less than"
+	case NP:
+		s = "not possible"
 	}
 	return s
 }
@@ -72,9 +79,33 @@ func (d Balance) String() string {
 //      if calle == arg {
 //          bal == EQ
 //      }
+//      if (calle can't be compared to arg) {
+//          bal == NP
+//      }
 // Think of Compare as asking the question, "what is the calle's relationship to arg?"
 type Comparer interface {
 	Compare(Comparer) Balance
+}
+
+type UncompareableTypeError struct {
+	this Comparer
+	that Comparer
+}
+
+func (e UncompareableTypeError) Error() string {
+	return fmt.Sprintf("gotree: Can not compare %T with the unkown type of %T", e.this, e.that)
+}
+
+type InvalidComparerError string
+
+func (e InvalidComparerError) Error() string {
+	return ("gotree: Can't use nil as item to search for.")
+}
+
+type NonexistentElemError string
+
+func (e NonexistentElemError) Error() string {
+	return "gotree: Remove could not find Elem."
 }
 
 /*
