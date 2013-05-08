@@ -33,19 +33,12 @@ type Node struct {
 	color       color
 }
 
-// rbIter is used to hold our state for iterative tree traversal methods.
-type rbIter struct {
-	current *Node
-	stack   []*Node
-	next    func() *Node
-}
-
 // A RBTree is our main type our redblack tree methods are defined on.
 type RBTree struct {
 	Height      int // Height from root to leaf
 	Size        int // Number of inserted elements
 	first, last *Node
-	iter        rbIter // initially ni
+	iterNext    func() *Node // initially ni
 	root        *Node
 }
 
@@ -76,12 +69,14 @@ func (t *RBTree) Max() Comparer {
 //  	for i, n := 0, tree.InitIter(PreOrder); n != nil; i, n = i+1, tree.Next() {
 //  		sum += int(n.Elem.(exInt)) + i
 //  	}
+// Note: If one was to break out of the loop prior to a complete traversal,
+// and start another loop without calling InitIter, then the previously uncompleted iterator is continued again.
 func (t *RBTree) Next() *Node {
 
-	n := t.iter.next() // func set by call to InitIter(TravOrder)
-	if n == nil {
+	if t.iterNext == nil {
+		return nil
 	}
-	return n
+	return t.iterNext() // func set by call to InitIter(TravOrder)
 
 }
 
@@ -93,7 +88,7 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 	stack := []*Node{}
 	switch order {
 	case InOrder:
-		t.iter.next = func() (out *Node) {
+		t.iterNext = func() (out *Node) {
 			for len(stack) > 0 || current != nil {
 				if current != nil {
 					stack = append(stack, current)
@@ -108,11 +103,15 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 					break
 				}
 			}
+			// last node, reset
+			if out == nil {
+				t.iterNext = nil
+			}
 			return out
 		}
 
 	case PreOrder:
-		t.iter.next = func() (out *Node) {
+		t.iterNext = func() (out *Node) {
 			for len(stack) > 0 || current != nil {
 				if current != nil {
 					out = current
@@ -126,6 +125,11 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 					stack = stack[0:stackIndex]
 				}
 			}
+
+			// last node, reset
+			if out == nil {
+				t.iterNext = nil
+			}
 			return out
 		}
 	case PostOrder:
@@ -135,7 +139,7 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 		stack = append(stack, current)
 		var prevNode *Node = nil
 
-		t.iter.next = func() (out *Node) {
+		t.iterNext = func() (out *Node) {
 			for len(stack) > 0 {
 				// peek
 				stackIndex := len(stack) - 1
@@ -162,6 +166,11 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 				}
 				prevNode = current
 			}
+
+			// last node, reset
+			if out == nil {
+				t.iterNext = nil
+			}
 			return out
 
 		}
@@ -170,7 +179,7 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 		panic(s)
 	}
 	// return our first node
-	return t.iter.next()
+	return t.iterNext()
 
 }
 
@@ -225,12 +234,14 @@ func (t *RBTree) Traverse(order TravOrder, f IterFunc) {
 }
 
 // Search takes as input any type implementing the Comparer interface and returns either:
-// a matching Comparer element as based upon their Compare function, and a true, or
-// a nil and a false.
+// a matching Comparer element as based upon that types Compare function along wih a nil error.
+// If given an item which can't be successfully compared within the array, found is returned with a nil, and
+// error is set to InvalidComparerError.
+// If a search within the tree comes up empty, found is nil, but error is populated with a NonexistentElemError.
 func (t *RBTree) Search(item Comparer) (found Comparer, err error) {
 	if item == nil {
-		var err InvalidComparerError
-		return nil, err
+		var e InvalidComparerError
+		return nil, e
 	}
 	x := t.root
 	for x != nil {
@@ -241,16 +252,17 @@ func (t *RBTree) Search(item Comparer) (found Comparer, err error) {
 			x = x.right
 		case EQ:
 			return x.Elem, nil
-		default:
-			return nil, UncompareableTypeError{x.Elem, item}
 		}
 	}
-	return nil, nil
+	var e NonexistentElemError
+	return nil, e
 }
 
 // Insert takes a type implementing the Comparer interface, this type is then inserted into the
 // tree. If there was a previous entry at the same insertion point as the item to be inserted,
 // the old element is returned.
+// If given an item which can't be successfully compared within the array, old is returned with a nil, and
+// error is set to InvalidComparerError.
 func (t *RBTree) Insert(item Comparer) (old Comparer, err error) {
 	if item == nil {
 		var err InvalidComparerError
@@ -263,10 +275,7 @@ func (t *RBTree) Insert(item Comparer) (old Comparer, err error) {
 		t.first = t.root
 		t.last = t.root
 	} else {
-		t.root, old, err = t.insert(t.root, item)
-		if err != nil {
-			return nil, err
-		}
+		t.root, old = t.insert(t.root, item)
 	}
 
 	if t.root.color == Red {
@@ -276,7 +285,7 @@ func (t *RBTree) Insert(item Comparer) (old Comparer, err error) {
 	return
 }
 
-func (t *RBTree) insert(h *Node, item Comparer) (root *Node, old Comparer, err error) {
+func (t *RBTree) insert(h *Node, item Comparer) (root *Node, old Comparer) {
 	if h == nil {
 		t.Size++
 		// base case, insert do stuff on new node
@@ -285,30 +294,23 @@ func (t *RBTree) insert(h *Node, item Comparer) (root *Node, old Comparer, err e
 		switch t.first.Elem.Compare(item) {
 		case GT:
 			t.first = n
-
-		case NP:
-			return nil, nil, UncompareableTypeError{t.first.Elem, item}
 		}
 		// set Max
 		switch t.last.Elem.Compare(item) {
 		case LT:
 			t.last = n
-		case NP:
-			return nil, nil, UncompareableTypeError{t.last.Elem, item}
 		}
-		return n, nil, nil
+		return n, nil
 	}
 
 	switch h.Elem.Compare(item) {
 	case GT:
-		h.left, old, err = t.insert(h.left, item)
+		h.left, old = t.insert(h.left, item)
 	case LT:
-		h.right, old, err = t.insert(h.right, item)
+		h.right, old = t.insert(h.right, item)
 	case EQ:
 		old = h.Elem
 		h.Elem = item
-	default:
-		return nil, nil, UncompareableTypeError{h.Elem, item}
 	}
 
 	if h.right.isRed() && !(h.left.isRed()) {
@@ -321,24 +323,38 @@ func (t *RBTree) insert(h *Node, item Comparer) (root *Node, old Comparer, err e
 	if h.left.isRed() && h.right.isRed() {
 		h.colorFlip()
 	}
-	return h, old, nil
+	return h, old
 }
 
+// Remove takes a type implementing the Comparer interface, this type is then searched on inside the tree.
+// If a matching entry is found the item is removed from the tree and old is populated with said removed item. error is nil in this case.
+// If when searching within the tree comes up empty, old is nil, but error is populated with a NonexistentElemError.
 func (t *RBTree) Remove(item Comparer) (old Comparer, err error) {
-	if item == nil {
+	if item == nil || t.root == nil {
 		var err InvalidComparerError
 		return nil, err
 	}
-	/*if found, err := t.Search(item); err != nil {
-		return err
-		if found == nil {
-			var err NonexistentElemError
-			return err
-		}
-	}*/
 	t.root, old, err = t.remove(t.root, item)
 	if err != nil {
 		return nil, err
+	} else if old != nil {
+		if t.root == nil {
+			t.first = nil
+			t.last = nil
+		} else {
+			// set Min
+			switch t.first.Elem.Compare(old) {
+			case EQ:
+				t.first = t.root.min()
+			}
+			// set Max
+			switch t.last.Elem.Compare(old) {
+			case EQ:
+				t.last = t.root.max()
+			}
+		}
+	} else {
+
 	}
 	if t.root != nil && t.root.color == Red {
 		t.root.color = Black // maintain rb invariants
@@ -353,14 +369,8 @@ func (t *RBTree) Remove(item Comparer) (old Comparer, err error) {
 // TODO Test error returns
 func (t *RBTree) remove(h *Node, item Comparer) (root *Node, old Comparer, err error) {
 
+	var e NonexistentElemError
 	switch h.Elem.Compare(item) {
-	case GT:
-		if h.left != nil {
-			if !h.left.isRed() && !(h.left.left.isRed()) {
-				h = h.moveRedLeft()
-			}
-			h.left, old, err = t.remove(h.left, item)
-		}
 	case LT, EQ:
 		if h.left.isRed() {
 			h = h.rotateRight()
@@ -369,8 +379,6 @@ func (t *RBTree) remove(h *Node, item Comparer) (root *Node, old Comparer, err e
 			old = h.Elem
 			t.Size--
 			return nil, old, nil
-		} else if result == NP {
-			return nil, nil, UncompareableTypeError{h.Elem, item}
 		}
 		if h.right != nil {
 			if !h.right.isRed() && !(h.right.left.isRed()) {
@@ -379,45 +387,25 @@ func (t *RBTree) remove(h *Node, item Comparer) (root *Node, old Comparer, err e
 			if result := h.Elem.Compare(item); result == EQ {
 				old = h.Elem
 				t.Size--
+
 				x := h.right.min()
 				h.Elem = x.Elem
 				h.right = h.right.removeMin()
 			} else {
 				h.right, old, err = t.remove(h.right, item)
 			}
-		}
-	case NP:
-		// no way to recover after broken search down the tree
-		//panic(UncompareableTypeError{h.Elem, item}.Error())
-		// TODO Find out if  correct way  to recover from deep within the tree.
-		// stop going down and just fake that we found our node?
+		} else {
 
-		// pretend we went left again
+			err = e
+		}
+	case GT:
 		if h.left != nil {
 			if !h.left.isRed() && !(h.left.left.isRed()) {
 				h = h.moveRedLeft()
 			}
-			h = h.left
-			// pretend we found it..
-			if h.left.isRed() {
-				h = h.rotateRight()
-			}
-			if h.right == nil {
-				return nil, nil, UncompareableTypeError{h.Elem, item}
-			}
-			if h.right != nil {
-				if !h.right.isRed() && !(h.right.left.isRed()) {
-					h = h.moveRedRight()
-				}
-				h = h.fixUp()
-
-				return h, nil, UncompareableTypeError{h.Elem, item}
-			}
-
+			h.left, old, err = t.remove(h.left, item)
 		} else {
-			h = h.fixUp()
-
-			return h, nil, UncompareableTypeError{h.Elem, item}
+			err = e
 		}
 	}
 	h = h.fixUp()
@@ -486,10 +474,13 @@ func (h *Node) fixUp() *Node {
 	}
 	return h
 }
-
 func (h *Node) min() *Node {
-	for h.left != nil {
-		h = h.left
+	for ; h.left != nil; h = h.left {
+	}
+	return h
+}
+func (h *Node) max() *Node {
+	for ; h.right != nil; h = h.right {
 	}
 	return h
 }

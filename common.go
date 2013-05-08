@@ -105,15 +105,12 @@ func (e InvalidComparerError) Error() string {
 type NonexistentElemError string
 
 func (e NonexistentElemError) Error() string {
-	return "gotree: Remove could not find Elem."
+	return "gotree: Could not find requested Elem."
 }
 
-/*
-Our function we can give to our iterators to work with our stored types.
-EX:
-    func printNode(n *Node}) {
-        fmt.Printf("ElementType: %T, ElementValue: %v\n", n.Elem,n.Elem)
-    }
-*/
-
+// A function we can give to our iterators to work with our stored types.
+// EX:
+//     func printNode(n *Node}) {
+//         fmt.Printf("ElementType: %T, ElementValue: %v\n", n.Elem,n.Elem)
+//     }
 type IterFunc func(*Node)

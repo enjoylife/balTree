@@ -16,7 +16,7 @@ var _ = spew.Dump
 var _ = fmt.Printf
 
 const (
-	searchTotal = 100000
+	searchTotal = 1000000
 	searchSpace = searchTotal / 2
 	iters       = 10000
 )
@@ -49,7 +49,6 @@ func (this exInt) Compare(b Comparer) Balance {
 		}
 
 	default:
-		return NP
 		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
 		panic(s)
 	}
@@ -99,7 +98,6 @@ func (this exString) Compare(b Comparer) Balance {
 		}
 
 	default:
-		return NP
 		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
 		panic(s)
 	}
@@ -185,22 +183,73 @@ func inc(t *testing.T) func(n *Node) {
 		}
 	}
 }
-func TestBasicInsert(t *testing.T) {
+func TestMaxInsert(t *testing.T) {
+	t.Parallel()
+	tree := &RBTree{}
 
-	var old Comparer
-	var check error
-	items := []exStruct{exStruct{0, "0"},
-		exStruct{2, "2"}, exStruct{2, "3"}}
+	if tree.Max() != nil {
+		fmt.Println(tree.Max())
+		t.Errorf("Max not working")
+	}
+	for i := 0; i < iters; i++ {
+		tree.Insert(exInt(i))
+		if tree.Max() != exInt(i) {
+			t.Errorf("Max not updateing")
+		}
+	}
+
+}
+func TestMinInsert(t *testing.T) {
+	t.Parallel()
 	tree := &RBTree{}
 
 	if tree.Min() != nil {
 		fmt.Println(tree.Min())
 		t.Errorf("Min not working")
 	}
-	if tree.Max() != nil {
-		fmt.Println(tree.Max())
-		t.Errorf("Max not working")
+	for i := iters; i > 0; i-- {
+		tree.Insert(exInt(i))
+		if tree.Min() != exInt(i) {
+			t.Errorf("Min not updateing")
+		}
 	}
+
+}
+func TestSizeInsert(t *testing.T) {
+	t.Parallel()
+
+	tree := &RBTree{}
+	for i := 0; i < iters; i++ {
+		tree.Insert(exInt(i))
+		if tree.Size != i+1 {
+			t.Errorf("Size not correctly updateing")
+		}
+	}
+
+}
+
+func TestErrorInsert(t *testing.T) {
+	t.Parallel()
+
+	var old Comparer
+	var check error
+	tree := &RBTree{}
+
+	old, check = tree.Insert(nil)
+	if _, ok := check.(InvalidComparerError); !ok || old != nil {
+		t.Errorf("Should Not be able to input nil")
+		t.Errorf("Error should be of type InvalidComparerError")
+	}
+}
+func TestBasicInsert(t *testing.T) {
+
+	t.Parallel()
+	var old Comparer
+	var check error
+	items := []exStruct{exStruct{0, "0"},
+		exStruct{2, "2"}, exStruct{2, "3"}}
+	tree := &RBTree{}
+
 	old, check = tree.Insert(items[0])
 	if check != nil || old != nil {
 		t.Errorf("First check on input is messed!")
@@ -211,12 +260,18 @@ func TestBasicInsert(t *testing.T) {
 	if check != nil {
 		t.Errorf("Check on old input is messed!")
 	}
+	if tree.Size != 2 {
+		t.Errorf("Problems tracking Size")
+	}
 	if old != items[1] {
 		t.Errorf("old input is messed!")
 	}
 	old, check = tree.Insert(items[1])
 	if check != nil {
 		t.Errorf("Check on old input is messed!")
+	}
+	if tree.Size != 2 {
+		t.Errorf("Problems tracking Size")
 	}
 	if old != items[2] {
 		t.Errorf("old input is messed!")
@@ -230,32 +285,9 @@ func TestBasicInsert(t *testing.T) {
 		t.Errorf("Max not working")
 	}
 }
-
-func TestErrorInsert(t *testing.T) {
-
-	var old Comparer
-	var check error
-	item1 := exStruct{0, "0"}
-	item2 := exString("1")
-	_ = item2
-	tree := &RBTree{}
-
-	old, check = tree.Insert(nil)
-	if _, ok := check.(InvalidComparerError); !ok || old != nil {
-		t.Errorf("Should Not be able to input nil")
-		t.Errorf("Error should be of type InvalidComparerError")
-	}
-	old, check = tree.Insert(item1)
-	old, check = tree.Insert(item2)
-	if _, ok := check.(UncompareableTypeError); !ok || old != nil {
-		t.Errorf("Should Not be able to input nil")
-		t.Errorf("Error should be of type UncompareableTypeError")
-	}
-
-}
-
 func TestRandomInsert(t *testing.T) {
 
+	t.Parallel()
 	r := rand.New(rand.NewSource(int64(5)))
 	tree := &RBTree{}
 	for i := 0; i < iters; i++ {
@@ -280,19 +312,20 @@ func BenchmarkMapInsert(b *testing.B) {
 	}
 
 }
-
 func BenchmarkInsert(b *testing.B) {
 
 	b.StopTimer()
 	tree := &RBTree{}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		tree.Insert(exInt(i))
+		tree.Insert(exInt(b.N - i))
 	}
+
 }
 
 func TestSearch(t *testing.T) {
 
+	t.Parallel()
 	tree := &RBTree{}
 	for i := 0; i < iters; i++ {
 		tree.Insert(exInt(i))
@@ -315,7 +348,7 @@ func TestSearch(t *testing.T) {
 
 	for i := iters; i < iters+1000; i++ {
 		value, ok := tree.Search(exInt(i))
-		if ok != nil {
+		if _, ok := ok.(NonexistentElemError); !ok {
 			t.Errorf("values should not be present")
 		}
 		if value != nil {
@@ -325,8 +358,84 @@ func TestSearch(t *testing.T) {
 }
 
 // TODO Test error returns
+
+func TestMaxRemove(t *testing.T) {
+	t.Parallel()
+	tree := &RBTree{}
+
+	for i := 0; i < iters; i++ {
+		tree.Insert(exInt(i))
+		if tree.Max() != exInt(i) {
+			t.Errorf("Max not updateing")
+		}
+	}
+	for i := iters; i > 0; i-- {
+		tree.Remove(exInt(i))
+		if tree.Max() != exInt(i-1) {
+			fmt.Println(tree.Max())
+			t.Errorf("Max not updateing")
+		}
+	}
+	tree.Remove(exInt(0))
+	if tree.Max() != nil {
+		fmt.Println(tree.Max())
+		t.Errorf("Max not updateing")
+	}
+
+}
+func TestMinRemove(t *testing.T) {
+	t.Parallel()
+	tree := &RBTree{}
+	var old Comparer
+	var check error
+
+	for i := iters; i >= 0; i-- {
+		tree.Insert(exInt(i))
+		if tree.Min() != exInt(i) {
+			fmt.Println(tree.Min())
+			t.Errorf("Min not updateing")
+		}
+	}
+	for i := 0; i < iters; i++ {
+
+		old, check = tree.Remove(exInt(i))
+		if old == nil || check != nil {
+			fmt.Println("old", old)
+			fmt.Println(check)
+			t.Errorf("Not giving back old value")
+		}
+		if tree.Min() != exInt(i+1) {
+			fmt.Println(tree.Min())
+			t.Errorf("Min not updateing")
+		}
+	}
+
+	tree.Remove(exInt(iters))
+	if tree.Min() != nil {
+		fmt.Println(tree.Min())
+		t.Errorf("Min not working")
+	}
+}
+func TestSizeRemove(t *testing.T) {
+	t.Parallel()
+	tree := &RBTree{}
+
+	for i := iters; i >= 0; i-- {
+		tree.Insert(exInt(i))
+	}
+
+	for i := 0; i < iters; i++ {
+		tree.Remove(exInt(i))
+		if tree.Size != (iters - i) {
+			fmt.Println(tree.Size)
+			t.Errorf("Size on remove not working")
+		}
+
+	}
+}
 func TestRemove(t *testing.T) {
 
+	t.Parallel()
 	var old Comparer
 	var check error
 	tree := &RBTree{}
@@ -349,12 +458,12 @@ func TestRemove(t *testing.T) {
 	for i := 0; i < max; i++ {
 		tree.Insert(exStruct{i, strconv.Itoa(i)})
 	}
-	index := rand.Perm(max)
-	for i := 0; i < max; i++ {
-		old, check = tree.Remove(exStruct{index[i], strconv.Itoa(index[i])})
-		if old == nil || check != nil {
+	for i := max; i < max*2; i++ {
+		old, check = tree.Remove(exStruct{i, strconv.Itoa(i)})
+		if old != nil || check == nil {
 			fmt.Println(old)
-			t.Errorf("Can't  remove prior inserts")
+			fmt.Println(check)
+			t.Errorf("Can't  ignore nonexisitant elements in remove.")
 		}
 		black := 0
 		for x := tree.root; x != nil; x = x.left {
@@ -369,60 +478,11 @@ func TestRemove(t *testing.T) {
 			t.Errorf("Tree is not balanced")
 		}
 	}
-
-}
-
-func TestComplexRemove(t *testing.T) {
-
-	var old Comparer
-	var check error
-	tree := &RBTree{}
-
-	max := 100
-
-	for y := 0; y < max; y++ {
-		for i := 0; i < max; i++ {
-			if rand.Float32() > 0.5 {
-				tree.Insert(exStruct{i, strconv.Itoa(i)})
-			} else {
-				tree.Insert(exInt(i))
-
-			}
-		}
-		index := rand.Perm(max)
-		for i := 0; i < max; i++ {
-			if rand.Float32() > 0.5 {
-				old, check = tree.Remove(exStruct{index[i], strconv.Itoa(index[i])})
-				if old == nil || check != nil {
-					fmt.Println(old)
-					t.Errorf("Can't  remove prior inserts")
-				}
-			} else {
-				old, check = tree.Remove(exString(strconv.Itoa(index[i])))
-				if old != nil || check == nil {
-					fmt.Println(check)
-					fmt.Println(old)
-					t.Errorf("Can't  remove prior inserts")
-				}
-			}
-			black := 0
-			for x := tree.root; x != nil; x = x.left {
-				if x.color == Black {
-					black++
-				}
-			}
-
-			if !isBalanced(tree) {
-				fmt.Println("Height", tree.Height)
-				fmt.Println("Calc Height", black)
-				t.Errorf("Tree is not balanced")
-			}
-		}
-	}
 }
 
 func TestIterIn(t *testing.T) {
 
+	t.Parallel()
 	tree := &RBTree{}
 	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
 	preOrder := []string{"d", "b", "a", "c", "h", "f", "e", "g", "i"}
@@ -433,7 +493,14 @@ func TestIterIn(t *testing.T) {
 	if !isBalanced(tree) {
 		t.Errorf("Tree is not balanced")
 	}
+	var check *Node
+	if check = tree.Next(); check != nil {
+		t.Errorf("Didn't avoid a non intialized next call")
+	}
 
+	if tree.iterNext != nil {
+		t.Errorf("Didn't reset iter")
+	}
 	count := 0
 
 	for i, n := 0, tree.InitIter(InOrder); n != nil; i, n = i+1, tree.Next() {
@@ -447,6 +514,13 @@ func TestIterIn(t *testing.T) {
 	if count != len(items) {
 		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
 	}
+
+	if check = tree.Next(); check != nil {
+		t.Errorf("Didn't avoid a non intialized next call")
+	}
+	if tree.iterNext != nil {
+		t.Errorf("Didn't reset iter")
+	}
 	count = 0
 	for i, n := 0, tree.InitIter(PreOrder); n != nil; i, n = i+1, tree.Next() {
 
@@ -458,6 +532,13 @@ func TestIterIn(t *testing.T) {
 	}
 	if count != len(items) {
 		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
+	}
+
+	if check = tree.Next(); check != nil {
+		t.Errorf("Didn't avoid a non intialized next call")
+	}
+	if tree.iterNext != nil {
+		t.Errorf("Didn't reset iter")
 	}
 	count = 0
 	for i, n := 0, tree.InitIter(PostOrder); n != nil; i, n = i+1, tree.Next() {
@@ -471,6 +552,12 @@ func TestIterIn(t *testing.T) {
 	if count != len(items) {
 		t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
 	}
+	if check = tree.Next(); check != nil {
+		t.Errorf("Didn't avoid a non intialized next call")
+	}
+	if tree.iterNext != nil {
+		t.Errorf("Didn't reset iter")
+	}
 
 	//tree.Traverse(PreOrder, printNode)
 	//scs := spew.ConfigState{Indent: "\t"}
@@ -479,6 +566,7 @@ func TestIterIn(t *testing.T) {
 }
 
 func TestTraversal(t *testing.T) {
+	t.Parallel()
 
 	tree := &RBTree{}
 	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
@@ -524,7 +612,7 @@ func BenchmarkRemove(b *testing.B) {
 		tree.Remove(a)
 	}*/
 	for i := 0; i < b.N; i++ {
-		tree.Remove(exInt(i))
+		tree.Remove(exInt(b.N - i))
 	}
 }
 
