@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"math/rand"
+	"strconv"
 	"testing"
 )
 
@@ -35,6 +36,18 @@ func (this exInt) Compare(b Comparer) Balance {
 		default:
 			return NP
 		}
+	case exStruct:
+		switch result := int(this) - that.M; {
+		case result > 0:
+			return GT
+		case result < 0:
+			return LT
+		case result == 0:
+			return EQ
+		default:
+			return NP
+		}
+
 	default:
 		return NP
 		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
@@ -72,6 +85,18 @@ func (this exString) Compare(b Comparer) Balance {
 		default:
 			return NP
 		}
+	case exInt:
+		a, _ := strconv.Atoi(string(this))
+		switch result := a - int(that); {
+		case result > 0:
+			return GT
+		case result < 0:
+			return LT
+		case result == 0:
+			return EQ
+		default:
+			return NP
+		}
 
 	default:
 		return NP
@@ -89,6 +114,17 @@ func (this exStruct) Compare(b Comparer) Balance {
 	switch that := b.(type) {
 	case exStruct:
 		switch result := int(this.M - that.M); {
+		case result > 0:
+			return GT
+		case result < 0:
+			return LT
+		case result == 0:
+			return EQ
+		default:
+			return NP
+		}
+	case exInt:
+		switch result := this.M - int(that); {
 		case result > 0:
 			return GT
 		case result < 0:
@@ -156,10 +192,6 @@ func TestBasicInsert(t *testing.T) {
 	items := []exStruct{exStruct{0, "0"},
 		exStruct{2, "2"}, exStruct{2, "3"}}
 	tree := &RBTree{}
-	old, check = tree.Insert(nil)
-	if old != nil || check == nil {
-		t.Errorf("Should Not be able to input nil")
-	}
 
 	if tree.Min() != nil {
 		fmt.Println(tree.Min())
@@ -199,7 +231,30 @@ func TestBasicInsert(t *testing.T) {
 	}
 }
 
-func TestMoreInsert(t *testing.T) {
+func TestErrorInsert(t *testing.T) {
+
+	var old Comparer
+	var check error
+	item1 := exStruct{0, "0"}
+	item2 := exString("1")
+	_ = item2
+	tree := &RBTree{}
+
+	old, check = tree.Insert(nil)
+	if _, ok := check.(InvalidComparerError); !ok || old != nil {
+		t.Errorf("Should Not be able to input nil")
+		t.Errorf("Error should be of type InvalidComparerError")
+	}
+	old, check = tree.Insert(item1)
+	old, check = tree.Insert(item2)
+	if _, ok := check.(UncompareableTypeError); !ok || old != nil {
+		t.Errorf("Should Not be able to input nil")
+		t.Errorf("Error should be of type UncompareableTypeError")
+	}
+
+}
+
+func TestRandomInsert(t *testing.T) {
 
 	r := rand.New(rand.NewSource(int64(5)))
 	tree := &RBTree{}
@@ -211,6 +266,29 @@ func TestMoreInsert(t *testing.T) {
 		t.Errorf("Tree is not balanced")
 	}
 	tree.Traverse(InOrder, inc(t))
+}
+
+func BenchmarkMapInsert(b *testing.B) {
+
+	b.StopTimer()
+	r := rand.New(rand.NewSource(int64(5)))
+	m := make(map[int]int)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		a := r.Int()
+		m[a] = a
+	}
+
+}
+
+func BenchmarkInsert(b *testing.B) {
+
+	b.StopTimer()
+	tree := &RBTree{}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		tree.Insert(exInt(i))
+	}
 }
 
 func TestSearch(t *testing.T) {
@@ -235,7 +313,7 @@ func TestSearch(t *testing.T) {
 		}
 	}
 
-	for i := iters; i < iters*2; i++ {
+	for i := iters; i < iters+1000; i++ {
 		value, ok := tree.Search(exInt(i))
 		if ok != nil {
 			t.Errorf("values should not be present")
@@ -246,16 +324,38 @@ func TestSearch(t *testing.T) {
 	}
 }
 
+// TODO Test error returns
 func TestRemove(t *testing.T) {
 
+	var old Comparer
+	var check error
 	tree := &RBTree{}
-	for i := 0; i < iters; i++ {
-		tree.Insert(exInt(i))
+
+	old, check = tree.Remove(nil)
+	if _, ok := check.(InvalidComparerError); !ok || old != nil {
+		t.Errorf("Should Not be able to remove nil")
+		t.Errorf("Error should be of type InvalidComparerError")
+	}
+	item1 := exStruct{0, "0"}
+	tree.Insert(item1)
+	old, check = tree.Remove(exStruct{0, "1"})
+	if old != item1 || check != nil {
+		fmt.Println(old)
+		fmt.Println(item1)
+		t.Errorf("Can't even remove simple root")
 	}
 
-	for i := 0; i < iters; i++ {
-		tree.Remove(exInt(i))
-
+	max := 100
+	for i := 0; i < max; i++ {
+		tree.Insert(exStruct{i, strconv.Itoa(i)})
+	}
+	index := rand.Perm(max)
+	for i := 0; i < max; i++ {
+		old, check = tree.Remove(exStruct{index[i], strconv.Itoa(index[i])})
+		if old == nil || check != nil {
+			fmt.Println(old)
+			t.Errorf("Can't  remove prior inserts")
+		}
 		black := 0
 		for x := tree.root; x != nil; x = x.left {
 			if x.color == Black {
@@ -270,6 +370,55 @@ func TestRemove(t *testing.T) {
 		}
 	}
 
+}
+
+func TestComplexRemove(t *testing.T) {
+
+	var old Comparer
+	var check error
+	tree := &RBTree{}
+
+	max := 100
+
+	for y := 0; y < max; y++ {
+		for i := 0; i < max; i++ {
+			if rand.Float32() > 0.5 {
+				tree.Insert(exStruct{i, strconv.Itoa(i)})
+			} else {
+				tree.Insert(exInt(i))
+
+			}
+		}
+		index := rand.Perm(max)
+		for i := 0; i < max; i++ {
+			if rand.Float32() > 0.5 {
+				old, check = tree.Remove(exStruct{index[i], strconv.Itoa(index[i])})
+				if old == nil || check != nil {
+					fmt.Println(old)
+					t.Errorf("Can't  remove prior inserts")
+				}
+			} else {
+				old, check = tree.Remove(exString(strconv.Itoa(index[i])))
+				if old != nil || check == nil {
+					fmt.Println(check)
+					fmt.Println(old)
+					t.Errorf("Can't  remove prior inserts")
+				}
+			}
+			black := 0
+			for x := tree.root; x != nil; x = x.left {
+				if x.color == Black {
+					black++
+				}
+			}
+
+			if !isBalanced(tree) {
+				fmt.Println("Height", tree.Height)
+				fmt.Println("Calc Height", black)
+				t.Errorf("Tree is not balanced")
+			}
+		}
+	}
 }
 
 func TestIterIn(t *testing.T) {
@@ -339,32 +488,10 @@ func TestTraversal(t *testing.T) {
 	if !isBalanced(tree) {
 		t.Errorf("Tree is not balanced")
 	}
-	tree.Traverse(InOrder, printNode)
+	//tree.Traverse(InOrder, printNode)
 
 }
 
-func BenchmarkMapInsert(b *testing.B) {
-
-	b.StopTimer()
-	r := rand.New(rand.NewSource(int64(5)))
-	m := make(map[int]int)
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		a := r.Int()
-		m[a] = a
-	}
-
-}
-
-func BenchmarkInsert(b *testing.B) {
-
-	b.StopTimer()
-	tree := &RBTree{}
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		tree.Insert(exInt(i))
-	}
-}
 func BenchmarkSearch(b *testing.B) {
 
 	b.StopTimer()

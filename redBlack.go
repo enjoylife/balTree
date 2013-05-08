@@ -264,7 +264,11 @@ func (t *RBTree) Insert(item Comparer) (old Comparer, err error) {
 		t.last = t.root
 	} else {
 		t.root, old, err = t.insert(t.root, item)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	if t.root.color == Red {
 		t.Height++
 	}
@@ -320,30 +324,34 @@ func (t *RBTree) insert(h *Node, item Comparer) (root *Node, old Comparer, err e
 	return h, old, nil
 }
 
-func (t *RBTree) Remove(item Comparer) (err error) {
+func (t *RBTree) Remove(item Comparer) (old Comparer, err error) {
 	if item == nil {
 		var err InvalidComparerError
-		return err
+		return nil, err
 	}
-	if found, err := t.Search(item); err != nil {
+	/*if found, err := t.Search(item); err != nil {
 		return err
 		if found == nil {
 			var err NonexistentElemError
 			return err
 		}
+	}*/
+	t.root, old, err = t.remove(t.root, item)
+	if err != nil {
+		return nil, err
 	}
-	t.root = t.remove(t.root, item)
 	if t.root != nil && t.root.color == Red {
 		t.root.color = Black // maintain rb invariants
 		t.Height--
 	} else if t.root == nil {
 		t.Height--
 	}
-	return nil
+	return old, nil
 
 }
 
-func (t *RBTree) remove(h *Node, item Comparer) *Node {
+// TODO Test error returns
+func (t *RBTree) remove(h *Node, item Comparer) (root *Node, old Comparer, err error) {
 
 	switch h.Elem.Compare(item) {
 	case GT:
@@ -351,32 +359,69 @@ func (t *RBTree) remove(h *Node, item Comparer) *Node {
 			if !h.left.isRed() && !(h.left.left.isRed()) {
 				h = h.moveRedLeft()
 			}
-			h.left = t.remove(h.left, item)
+			h.left, old, err = t.remove(h.left, item)
 		}
-	default:
+	case LT, EQ:
 		if h.left.isRed() {
 			h = h.rotateRight()
 		}
 		if result := h.Elem.Compare(item); result == EQ && h.right == nil {
+			old = h.Elem
 			t.Size--
-			return nil
+			return nil, old, nil
+		} else if result == NP {
+			return nil, nil, UncompareableTypeError{h.Elem, item}
 		}
-
 		if h.right != nil {
 			if !h.right.isRed() && !(h.right.left.isRed()) {
 				h = h.moveRedRight()
 			}
 			if result := h.Elem.Compare(item); result == EQ {
+				old = h.Elem
 				t.Size--
 				x := h.right.min()
 				h.Elem = x.Elem
 				h.right = h.right.removeMin()
 			} else {
-				h.right = t.remove(h.right, item)
+				h.right, old, err = t.remove(h.right, item)
 			}
 		}
+	case NP:
+		// no way to recover after broken search down the tree
+		//panic(UncompareableTypeError{h.Elem, item}.Error())
+		// TODO Find out if  correct way  to recover from deep within the tree.
+		// stop going down and just fake that we found our node?
+
+		// pretend we went left again
+		if h.left != nil {
+			if !h.left.isRed() && !(h.left.left.isRed()) {
+				h = h.moveRedLeft()
+			}
+			h = h.left
+			// pretend we found it..
+			if h.left.isRed() {
+				h = h.rotateRight()
+			}
+			if h.right == nil {
+				return nil, nil, UncompareableTypeError{h.Elem, item}
+			}
+			if h.right != nil {
+				if !h.right.isRed() && !(h.right.left.isRed()) {
+					h = h.moveRedRight()
+				}
+				h = h.fixUp()
+
+				return h, nil, UncompareableTypeError{h.Elem, item}
+			}
+
+		} else {
+			h = h.fixUp()
+
+			return h, nil, UncompareableTypeError{h.Elem, item}
+		}
 	}
-	return h.fixUp()
+	h = h.fixUp()
+	return h, old, err
 }
 
 // Left Leaning Red Black Tree functions and helpers to maintain public methods
