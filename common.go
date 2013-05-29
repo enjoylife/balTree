@@ -60,7 +60,7 @@ func (d Balance) String() string {
 	return s
 }
 
-// Comparer is a one method interface type.
+// Interface is a one method interface type.
 // Types which implement a Compare method can be inserted into a Tree.
 // Compare returns a Balance with respect to the total order between the method calle and its given
 // arguement.
@@ -71,34 +71,45 @@ func (d Balance) String() string {
 // The result of bal should follow this logic:
 //
 //      if calle < arg {
-//          bal == LT
+//          // ...
+//          return // bal == LT
 //      }
+//
 //      if calle > arg {
-//          bal == GT
+//          // ...
+//          return // bal == GT
 //      }
+//      //bal == GT
+//
 //      if calle == arg {
-//          bal == EQ
+//          // ...
+//          return // bal == EQ
 //      }
+//
 //      if (calle can't be compared to arg) {
-//          bal == NP
+//          // ...
+//          return // bal == NP
 //      }
 // Think of Compare as asking the question, "what is the calle's relationship to arg?"
-type Comparer interface {
-	Compare(Comparer) Balance
+// Is the calle less than arg, is it greater than, etc.
+
+// To Insert a type into the RBTree it must implement this one method interface.
+type Interface interface {
+	Compare(Interface) Balance
 }
 
 type UncompareableTypeError struct {
-	this Comparer
-	that Comparer
+	this Interface
+	that Interface
 }
 
 func (e UncompareableTypeError) Error() string {
 	return fmt.Sprintf("gotree: Can not compare %T with the unkown type of %T", e.this, e.that)
 }
 
-type InvalidComparerError string
+type InvalidInterfaceError string
 
-func (e InvalidComparerError) Error() string {
+func (e InvalidInterfaceError) Error() string {
 	return ("gotree: Can't use nil as item to search for.")
 }
 

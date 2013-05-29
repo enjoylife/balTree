@@ -23,7 +23,7 @@ const (
 
 type exInt int
 
-func (this exInt) Compare(b Comparer) Balance {
+func (this exInt) Compare(b Interface) Balance {
 	switch that := b.(type) {
 	case exInt:
 		switch result := int(this - that); {
@@ -57,7 +57,7 @@ func (this exInt) Compare(b Comparer) Balance {
 
 type exString string
 
-func (this exString) Compare(b Comparer) Balance {
+func (this exString) Compare(b Interface) Balance {
 	switch that := b.(type) {
 	case exString:
 		a := string(this)
@@ -108,7 +108,7 @@ type exStruct struct {
 	S string
 }
 
-func (this exStruct) Compare(b Comparer) Balance {
+func (this exStruct) Compare(b Interface) Balance {
 	switch that := b.(type) {
 	case exStruct:
 		switch result := int(this.M - that.M); {
@@ -231,20 +231,20 @@ func TestSizeInsert(t *testing.T) {
 func TestErrorInsert(t *testing.T) {
 	t.Parallel()
 
-	var old Comparer
+	var old Interface
 	var check error
 	tree := &RBTree{}
 
 	old, check = tree.Insert(nil)
-	if _, ok := check.(InvalidComparerError); !ok || old != nil {
+	if _, ok := check.(InvalidInterfaceError); !ok || old != nil {
 		t.Errorf("Should Not be able to input nil")
-		t.Errorf("Error should be of type InvalidComparerError")
+		t.Errorf("Error should be of type InvalidInterfaceError")
 	}
 }
 func TestBasicInsert(t *testing.T) {
 
 	t.Parallel()
-	var old Comparer
+	var old Interface
 	var check error
 	items := []exStruct{exStruct{0, "0"},
 		exStruct{2, "2"}, exStruct{2, "3"}}
@@ -297,7 +297,7 @@ func TestRandomInsert(t *testing.T) {
 	if !isBalanced(tree) {
 		t.Errorf("Tree is not balanced")
 	}
-	tree.Traverse(InOrder, inc(t))
+	tree.Map(InOrder, inc(t))
 }
 
 func BenchmarkMapInsert(b *testing.B) {
@@ -335,7 +335,7 @@ func TestSearch(t *testing.T) {
 		t.Errorf("Not minding nil key's")
 	}
 
-	tree.Traverse(InOrder, inc(t))
+	tree.Map(InOrder, inc(t))
 	for i := 0; i < iters; i++ {
 		value, ok := tree.Search(exInt(i))
 		if ok != nil {
@@ -386,7 +386,7 @@ func TestMaxRemove(t *testing.T) {
 func TestMinRemove(t *testing.T) {
 	t.Parallel()
 	tree := &RBTree{}
-	var old Comparer
+	var old Interface
 	var check error
 
 	for i := iters; i >= 0; i-- {
@@ -436,14 +436,14 @@ func TestSizeRemove(t *testing.T) {
 func TestRemove(t *testing.T) {
 
 	t.Parallel()
-	var old Comparer
+	var old Interface
 	var check error
 	tree := &RBTree{}
 
 	old, check = tree.Remove(nil)
-	if _, ok := check.(InvalidComparerError); !ok || old != nil {
+	if _, ok := check.(InvalidInterfaceError); !ok || old != nil {
 		t.Errorf("Should Not be able to remove nil")
-		t.Errorf("Error should be of type InvalidComparerError")
+		t.Errorf("Error should be of type InvalidInterfaceError")
 	}
 	item1 := exStruct{0, "0"}
 	tree.Insert(item1)
@@ -559,7 +559,7 @@ func TestIterIn(t *testing.T) {
 		t.Errorf("Didn't reset iter")
 	}
 
-	//tree.Traverse(PreOrder, printNode)
+	//tree.Map(PreOrder, printNode)
 	//scs := spew.ConfigState{Indent: "\t"}
 	//scs.Dump(tree.root)
 
@@ -576,7 +576,7 @@ func TestTraversal(t *testing.T) {
 	if !isBalanced(tree) {
 		t.Errorf("Tree is not balanced")
 	}
-	//tree.Traverse(InOrder, printNode)
+	//tree.Map(InOrder, printNode)
 
 }
 
@@ -677,7 +677,7 @@ func recurse() func(n *Node) {
 		sum += int(n.Elem.(exInt))
 	}
 }
-func BenchmarkRecurseTraverseInorderOrder(b *testing.B) {
+func BenchmarkRecurseMapInorderOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
@@ -688,12 +688,12 @@ func BenchmarkRecurseTraverseInorderOrder(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		f := recurse()
-		tree.Traverse(InOrder, f)
+		tree.Map(InOrder, f)
 
 	}
 
 }
-func BenchmarkRecurseTraversePreorderOrder(b *testing.B) {
+func BenchmarkRecurseMapPreorderOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
@@ -704,12 +704,12 @@ func BenchmarkRecurseTraversePreorderOrder(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		f := recurse()
-		tree.Traverse(PreOrder, f)
+		tree.Map(PreOrder, f)
 
 	}
 
 }
-func BenchmarkRecurseTraversePostOrder(b *testing.B) {
+func BenchmarkRecurseMapPostOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
@@ -720,7 +720,7 @@ func BenchmarkRecurseTraversePostOrder(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		f := recurse()
-		tree.Traverse(PostOrder, f)
+		tree.Map(PostOrder, f)
 
 	}
 

@@ -27,7 +27,7 @@ func (c color) String() string {
 // A Node is the type manipulated within the tree. It holds the inserted elements.
 // It is exposed whenever the tree traversal functions are used.
 type Node struct {
-	Elem Comparer
+	Elem Interface
 	//
 	left, right *Node
 	color       color
@@ -44,7 +44,7 @@ type RBTree struct {
 
 // Min returns the smallest inserted element if possible. If the smallest value is not
 // found(empty tree), then Min returns a nil.
-func (t *RBTree) Min() Comparer {
+func (t *RBTree) Min() Interface {
 	if t.first != nil {
 		return t.first.Elem
 	}
@@ -53,7 +53,7 @@ func (t *RBTree) Min() Comparer {
 
 // Max returns the largest inserted element if possible. If the largest value is not
 // found(empty tree), then Max returns a nil.
-func (t *RBTree) Max() Comparer {
+func (t *RBTree) Max() Interface {
 	if t.last != nil {
 		return t.last.Elem
 	}
@@ -183,13 +183,13 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 
 }
 
-// Traverse is a more performance orientated way to iterate over the elements of the tree.
+// Map is a more performance orientated way to iterate over the elements of the tree.
 // Given a TravOrder and a function which conforms to the IterFunc type:
 //
 //      type IterFunc func(*Node)
 //
-// Traverse calls the function for each Node  in the specified order.
-func (t *RBTree) Traverse(order TravOrder, f IterFunc) {
+// Map calls the function for each Node  in the specified order.
+func (t *RBTree) Map(order TravOrder, f IterFunc) {
 
 	n := t.root
 	switch order {
@@ -233,14 +233,14 @@ func (t *RBTree) Traverse(order TravOrder, f IterFunc) {
 
 }
 
-// Search takes as input any type implementing the Comparer interface and returns either:
-// a matching Comparer element as based upon that types Compare function along wih a nil error.
+// Search takes as input any type implementing the Interface interface and returns either:
+// a matching Interface element as based upon that types Compare function along wih a nil error.
 // If given an item which can't be successfully compared within the array, found is returned with a nil, and
-// error is set to InvalidComparerError.
+// error is set to InvalidInterfaceError.
 // If a search within the tree comes up empty, found is nil, but error is populated with a NonexistentElemError.
-func (t *RBTree) Search(item Comparer) (found Comparer, err error) {
+func (t *RBTree) Search(item Interface) (found Interface, err error) {
 	if item == nil {
-		var e InvalidComparerError
+		var e InvalidInterfaceError
 		return nil, e
 	}
 	x := t.root
@@ -258,14 +258,14 @@ func (t *RBTree) Search(item Comparer) (found Comparer, err error) {
 	return nil, e
 }
 
-// Insert takes a type implementing the Comparer interface, this type is then inserted into the
+// Insert takes a type implementing the Interface interface, this type is then inserted into the
 // tree. If there was a previous entry at the same insertion point as the item to be inserted,
 // the old element is returned.
 // If given an item which can't be successfully compared within the array, old is returned with a nil, and
-// error is set to InvalidComparerError.
-func (t *RBTree) Insert(item Comparer) (old Comparer, err error) {
+// error is set to InvalidInterfaceError.
+func (t *RBTree) Insert(item Interface) (old Interface, err error) {
 	if item == nil {
-		var err InvalidComparerError
+		var err InvalidInterfaceError
 		return nil, err
 	}
 
@@ -285,7 +285,7 @@ func (t *RBTree) Insert(item Comparer) (old Comparer, err error) {
 	return
 }
 
-func (t *RBTree) insert(h *Node, item Comparer) (root *Node, old Comparer) {
+func (t *RBTree) insert(h *Node, item Interface) (root *Node, old Interface) {
 	if h == nil {
 		t.Size++
 		// base case, insert do stuff on new node
@@ -326,12 +326,12 @@ func (t *RBTree) insert(h *Node, item Comparer) (root *Node, old Comparer) {
 	return h, old
 }
 
-// Remove takes a type implementing the Comparer interface, this type is then searched on inside the tree.
+// Remove takes a type implementing the Interface interface, this type is then searched on inside the tree.
 // If a matching entry is found the item is removed from the tree and old is populated with said removed item. error is nil in this case.
 // If when searching within the tree comes up empty, old is nil, but error is populated with a NonexistentElemError.
-func (t *RBTree) Remove(item Comparer) (old Comparer, err error) {
+func (t *RBTree) Remove(item Interface) (old Interface, err error) {
 	if item == nil || t.root == nil {
-		var err InvalidComparerError
+		var err InvalidInterfaceError
 		return nil, err
 	}
 	t.root, old, err = t.remove(t.root, item)
@@ -367,7 +367,7 @@ func (t *RBTree) Remove(item Comparer) (old Comparer, err error) {
 }
 
 // TODO Test error returns
-func (t *RBTree) remove(h *Node, item Comparer) (root *Node, old Comparer, err error) {
+func (t *RBTree) remove(h *Node, item Interface) (root *Node, old Interface, err error) {
 
 	var e NonexistentElemError
 	switch h.Elem.Compare(item) {
