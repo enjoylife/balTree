@@ -10,8 +10,6 @@ import (
 func init() {
 }
 
-var _ = fmt.Printf
-
 /* Helpers for tree traversal and testing tree properties */
 func printRBNode(n *RBNode) {
 	//x := n.Elem
@@ -22,26 +20,25 @@ func isBalanced(t *RBTree) bool {
 	if t == nil {
 		return true
 	}
-	var black int // number of black links on path from root to min
-	black = 0
+	h := 0
 	for x := t.root; x != nil; x = x.left {
-		if x.color == Black {
-			black++
+		if x.color == black {
+			h++
 		}
 	}
-	return nodeIsBalanced(t.root, black) && t.Height == black
+	return nodeIsBalanced(t.root, h) && t.Height() == h
 }
 
-func nodeIsBalanced(n *RBNode, black int) bool {
-	if n == nil && black == 0 {
+func nodeIsBalanced(n *RBNode, h int) bool {
+	if n == nil && h == 0 {
 		return true
-	} else if n == nil && black != 0 {
+	} else if n == nil && h != 0 {
 		return false
 	}
-	if n.color == Black {
-		black--
+	if n.color == black {
+		h--
 	}
-	return nodeIsBalanced(n.left, black) && nodeIsBalanced(n.right, black)
+	return nodeIsBalanced(n.left, h) && nodeIsBalanced(n.right, h)
 }
 
 // Max, Min Size tests
@@ -101,51 +98,29 @@ func TestSizeInsert(t *testing.T) {
 
 }
 
-// Error return tests
-func TestErrorInsert(t *testing.T) {
-	t.Parallel()
-
-	var old Interface
-	var check error
-	tree := &RBTree{}
-
-	old, check = tree.Insert(nil)
-	if _, ok := check.(InvalidInterfaceError); !ok || old != nil {
-		t.Errorf("Should Not be able to input nil")
-		t.Errorf("Error should be of type InvalidInterfaceError")
-	}
-}
-
 // Edge case tests for insert
 func TestBasicInsert(t *testing.T) {
 
 	t.Parallel()
 	var old Interface
-	var check error
 	items := []exStruct{exStruct{0, "0"},
 		exStruct{2, "2"}, exStruct{2, "3"}}
 	tree := &RBTree{}
 
-	old, check = tree.Insert(items[0])
-	if check != nil || old != nil {
+	old = tree.Insert(items[0])
+	if old != nil {
 		t.Errorf("First check on input is messed!")
 	}
 
 	tree.Insert(items[1])
-	old, check = tree.Insert(items[2])
-	if check != nil {
-		t.Errorf("Check on old input is messed!")
-	}
+	old = tree.Insert(items[2])
 	if tree.Size != 2 {
 		t.Errorf("Problems tracking Size")
 	}
 	if old != items[1] {
 		t.Errorf("old input is messed!")
 	}
-	old, check = tree.Insert(items[1])
-	if check != nil {
-		t.Errorf("Check on old input is messed!")
-	}
+	old = tree.Insert(items[1])
 	if tree.Size != 2 {
 		t.Errorf("Problems tracking Size")
 	}
@@ -180,38 +155,33 @@ func TestRandomInsert(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 
+	var elem Interface
 	t.Parallel()
 	tree := &RBTree{}
 
-	_, ok := tree.Search(exInt(1))
-	if ok != nil {
+	elem = tree.Search(exInt(1))
+	if elem != nil {
 		t.Errorf("Not minding empty tree")
 	}
 
 	for i := 0; i < iters; i++ {
 		tree.Insert(exInt(i))
 	}
-	_, ok = tree.Search(nil)
-	if ok == nil {
+	elem = tree.Search(exInt(1))
+	if elem == nil {
 		t.Errorf("Not minding nil key's")
 	}
 
 	tree.Map(InOrder, inc(t))
 	for i := 0; i < iters; i++ {
-		value, ok := tree.Search(exInt(i))
-		if ok != nil {
-			t.Errorf("All these values should be present")
-		}
+		value := tree.Search(exInt(i))
 		if int(value.(exInt)) != i {
 			t.Errorf("Values don't match Exp: %d, Got: %d", i, value)
 		}
 	}
 
 	for i := iters; i < iters+1000; i++ {
-		value, ok := tree.Search(exInt(i))
-		if ok != nil {
-			t.Errorf("values should not be present")
-		}
+		value := tree.Search(exInt(i))
 		if value != nil {
 			t.Errorf("Values don't match Exp: %d, Got: %d", i, value)
 		}
@@ -223,27 +193,24 @@ func TestRemove(t *testing.T) {
 
 	t.Parallel()
 	var old Interface
-	var check error
 	tree := &RBTree{}
 
-	old, check = tree.Remove(nil)
-	if _, ok := check.(InvalidInterfaceError); !ok || old != nil {
+	old = tree.Remove(nil)
+	if old != nil {
 		t.Errorf("Should Not be able to remove nil")
-		t.Errorf("Error should be of type InvalidInterfaceError")
 	}
 
 	item1 := exStruct{0, "0"}
-	old, check = tree.Remove(exStruct{0, "1"})
-	if old != nil || check == nil {
+	old = tree.Remove(exStruct{0, "1"})
+	if old != nil {
 		fmt.Println(old)
-		fmt.Println(check)
 		fmt.Println(item1)
 		t.Errorf("Not minding empty tree.")
 	}
 
 	tree.Insert(item1)
-	old, check = tree.Remove(exStruct{0, "1"})
-	if old != item1 || check != nil {
+	old = tree.Remove(exStruct{0, "1"})
+	if old != item1 {
 		fmt.Println(old)
 		fmt.Println(item1)
 		t.Errorf("Can't even remove simple root")
@@ -254,21 +221,20 @@ func TestRemove(t *testing.T) {
 		tree.Insert(exStruct{i, strconv.Itoa(i)})
 	}
 	for i := max; i < max*2; i++ {
-		old, check = tree.Remove(exStruct{i, strconv.Itoa(i)})
-		if old != nil || check == nil {
+		old = tree.Remove(exStruct{i, strconv.Itoa(i)})
+		if old != nil {
 			fmt.Println(old)
-			fmt.Println(check)
 			t.Errorf("Can't  ignore nonexisitant elements in remove.")
 		}
-		black := 0
+		h := 0
 		for x := tree.root; x != nil; x = x.left {
-			if x.color == Black {
-				black++
+			if x.color == black {
+				h++
 			}
 		}
 
 		if !isBalanced(tree) {
-			fmt.Println("Height", tree.Height)
+			fmt.Println("Height", tree.Height())
 			fmt.Println("Calc Height", black)
 			t.Errorf("Tree is not balanced")
 		}
@@ -313,8 +279,8 @@ func TestMinRemove(t *testing.T) {
 	}
 	for i := 0; i < iters; i++ {
 
-		old, check = tree.Remove(exInt(i))
-		if old == nil || check != nil {
+		old = tree.Remove(exInt(i))
+		if old == nil {
 			fmt.Println("old", old)
 			fmt.Println(check)
 			t.Errorf("Not giving back old value")
@@ -362,16 +328,16 @@ func TestRandomRemove(t *testing.T) {
 
 	for _, value := range m {
 		tree.Remove(exInt(value))
-		black := 0
+		h := 0
 		for x := tree.root; x != nil; x = x.left {
-			if x.color == Black {
-				black++
+			if x.color == black {
+				h++
 			}
 		}
 
 		if !isBalanced(tree) {
-			fmt.Println("Height", tree.Height)
-			fmt.Println("Calc Height", black)
+			fmt.Println("Height", tree.Height())
+			fmt.Println("Calc Height", h)
 			t.Errorf("Tree is not balanced")
 		}
 	}
@@ -401,7 +367,7 @@ func TestIterIn(t *testing.T) {
 	}
 	count := 0
 
-	for i, n := 0, tree.InitIter(InOrder); n != nil; i, n = i+1, tree.Next() {
+	for i, n := 0, tree.IterInit(InOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
 		if items[i] != string(n.Elem.(exString)) {
@@ -420,7 +386,7 @@ func TestIterIn(t *testing.T) {
 		t.Errorf("Didn't reset iter")
 	}
 	count = 0
-	for i, n := 0, tree.InitIter(PreOrder); n != nil; i, n = i+1, tree.Next() {
+	for i, n := 0, tree.IterInit(PreOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
 		if preOrder[i] != string(n.Elem.(exString)) {
@@ -439,7 +405,7 @@ func TestIterIn(t *testing.T) {
 		t.Errorf("Didn't reset iter")
 	}
 	count = 0
-	for i, n := 0, tree.InitIter(PostOrder); n != nil; i, n = i+1, tree.Next() {
+	for i, n := 0, tree.IterInit(PostOrder); n != nil; i, n = i+1, tree.Next() {
 
 		count++
 		if postOrder[i] != string(n.Elem.(exString)) {
@@ -544,7 +510,7 @@ func BenchmarkIterInOrder(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		sum := 0
 
-		for i, n := 0, tree.InitIter(InOrder); n != nil; i, n = i+1, tree.Next() {
+		for i, n := 0, tree.IterInit(InOrder); n != nil; i, n = i+1, tree.Next() {
 			sum += int(n.Elem.(exInt))
 		}
 	}
@@ -562,7 +528,7 @@ func BenchmarkIterPreOrder(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		sum := 0
 
-		for i, n := 0, tree.InitIter(PreOrder); n != nil; i, n = i+1, tree.Next() {
+		for i, n := 0, tree.IterInit(PreOrder); n != nil; i, n = i+1, tree.Next() {
 			sum += int(n.Elem.(exInt))
 		}
 	}
@@ -580,7 +546,7 @@ func BenchmarkIterPostOrder(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		sum := 0
 
-		for i, n := 0, tree.InitIter(PostOrder); n != nil; i, n = i+1, tree.Next() {
+		for i, n := 0, tree.IterInit(PostOrder); n != nil; i, n = i+1, tree.Next() {
 			sum += int(n.Elem.(exInt))
 		}
 	}

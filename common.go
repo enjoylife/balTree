@@ -1,17 +1,15 @@
 package gotree
 
-import (
-	"fmt"
-)
+import ()
 
 // Our possible tree traversal ablitites
 type TravOrder int
 
 const (
-	InOrder    TravOrder = iota // a,b,c,d,e,f,g,h,i
-	PreOrder                    // d,b,a,c,h,f,e,g,i
-	PostOrder                   // a,c,b,e,g,f,i,h,d
-	LevelOrder                  // dependent on tree state
+	InOrder TravOrder = iota
+	PreOrder
+	PostOrder
+	LevelOrder
 )
 
 // implement the String interface for human readable names of traversal ablities
@@ -27,8 +25,6 @@ func (order TravOrder) String() string {
 		s = "in-order traversal"
 	case LevelOrder:
 		s = "level-order traversal"
-	default:
-		s = "unkown traversal"
 	}
 	return s
 }
@@ -40,7 +36,6 @@ const (
 	GT Balance = iota
 	EQ
 	LT
-	NP
 )
 
 // human readable representation of Balance values
@@ -54,8 +49,6 @@ func (d Balance) String() string {
 		s = "equal to"
 	case LT:
 		s = "less than"
-	case NP:
-		s = "not possible"
 	}
 	return s
 }
@@ -85,10 +78,6 @@ func (d Balance) String() string {
 //          return // bal == EQ
 //      }
 //
-//      if (calle can't be compared to arg) {
-//          // ...
-//          return // bal == NP
-//      }
 //
 // Think of Compare as asking the question, "what is the calle's relationship to arg?"
 // Is the calle less than arg? Is it greater than, etc.
@@ -98,6 +87,7 @@ type Interface interface {
 	Compare(Interface) Balance
 }
 
+/*
 // This is returned when a Interface's compare method returns a NP case.```
 type UncompareableTypeError struct {
 	this Interface
@@ -120,3 +110,4 @@ type NonexistentElemError string
 func (e NonexistentElemError) Error() string {
 	return "gotree: Could not find requested Elem."
 }
+*/

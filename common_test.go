@@ -1,7 +1,6 @@
 package gotree
 
 import (
-	"fmt"
 	"strconv"
 )
 
@@ -14,40 +13,35 @@ const (
 type exInt int
 
 func (this exInt) Compare(b Interface) Balance {
+	var out Balance
 	switch that := b.(type) {
 	case exInt:
 		switch result := int(this - that); {
 		case result > 0:
-			return GT
+			out = GT
 		case result < 0:
-			return LT
+			out = LT
 		case result == 0:
-			return EQ
-		default:
-			return NP
+			out = EQ
 		}
 	case exStruct:
 		switch result := int(this) - that.M; {
 		case result > 0:
-			return GT
+			out = GT
 		case result < 0:
-			return LT
+			out = GT
 		case result == 0:
-			return EQ
-		default:
-			return NP
+			out = EQ
 		}
 
-	default:
-		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
-		panic(s)
 	}
-
+	return out
 }
 
 type exString string
 
 func (this exString) Compare(b Interface) Balance {
+	var out Balance
 	switch that := b.(type) {
 	case exString:
 		a := string(this)
@@ -66,31 +60,25 @@ func (this exString) Compare(b Interface) Balance {
 
 		switch result := diff; {
 		case result > 0:
-			return GT
+			out = GT
 		case result < 0:
-			return LT
+			out = LT
 		case result == 0:
-			return EQ
-		default:
-			return NP
+			out = EQ
 		}
 	case exInt:
 		a, _ := strconv.Atoi(string(this))
 		switch result := a - int(that); {
 		case result > 0:
-			return GT
+			out = GT
 		case result < 0:
-			return LT
+			out = LT
 		case result == 0:
-			return EQ
-		default:
-			return NP
+			out = EQ
 		}
 
-	default:
-		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
-		panic(s)
 	}
+	return out
 }
 
 type exStruct struct {
@@ -99,32 +87,26 @@ type exStruct struct {
 }
 
 func (this exStruct) Compare(b Interface) Balance {
+	var out Balance
 	switch that := b.(type) {
 	case exStruct:
 		switch result := int(this.M - that.M); {
 		case result > 0:
-			return GT
+			out = GT
 		case result < 0:
-			return LT
+			out = LT
 		case result == 0:
-			return EQ
-		default:
-			return NP
+			out = EQ
 		}
 	case exInt:
 		switch result := this.M - int(that); {
 		case result > 0:
-			return GT
+			out = GT
 		case result < 0:
-			return LT
+			out = LT
 		case result == 0:
-			return EQ
-		default:
-			return NP
+			out = EQ
 		}
-	default:
-		return NP
-		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
-		panic(s)
 	}
+	return out
 }
