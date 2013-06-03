@@ -24,12 +24,11 @@ func (c color) String() string {
 	return s
 }
 
-// A Node is the type manipulated within the tree. It holds the inserted elements.
+// A RBNode is the type manipulated within the tree. It holds the inserted elements.
 // It is exposed whenever the tree traversal functions are used.
-type Node struct {
-	Elem Interface
-	//
-	left, right *Node
+type RBNode struct {
+	Elem        Interface
+	left, right *RBNode
 	color       color
 }
 
@@ -37,10 +36,17 @@ type Node struct {
 type RBTree struct {
 	Height      int // Height from root to leaf
 	Size        int // Number of inserted elements
-	first, last *Node
-	iterNext    func() *Node // initially ni
-	root        *Node
+	first, last *RBNode
+	iterNext    func() *RBNode // initially nil
+	root        *RBNode
 }
+
+// A function we can give to our iterators to work with our stored types.
+// EX:
+//     func printRBNode(n *RBNode}) {
+//         fmt.Printf("ElementType: %T, ElementValue: %v\n", n.Elem,n.Elem)
+//     }
+type RBIterFunc func(*RBNode)
 
 // Min returns the smallest inserted element if possible. If the smallest value is not
 // found(empty tree), then Min returns a nil.
@@ -71,7 +77,7 @@ func (t *RBTree) Max() Interface {
 //  	}
 // Note: If one was to break out of the loop prior to a complete traversal,
 // and start another loop without calling InitIter, then the previously uncompleted iterator is continued again.
-func (t *RBTree) Next() *Node {
+func (t *RBTree) Next() *RBNode {
 
 	if t.iterNext == nil {
 		return nil
@@ -81,14 +87,14 @@ func (t *RBTree) Next() *Node {
 }
 
 // InitIter is the initializer which setups the tree for iterating over it's elements in
-// a specific order. It setups the internal data, and then returns the first Node to be looked at. See Next for an example.
-func (t *RBTree) InitIter(order TravOrder) *Node {
+// a specific order. It setups the internal data, and then returns the first RBNode to be looked at. See Next for an example.
+func (t *RBTree) InitIter(order TravOrder) *RBNode {
 
 	current := t.root
-	stack := []*Node{}
+	stack := []*RBNode{}
 	switch order {
 	case InOrder:
-		t.iterNext = func() (out *Node) {
+		t.iterNext = func() (out *RBNode) {
 			for len(stack) > 0 || current != nil {
 				if current != nil {
 					stack = append(stack, current)
@@ -111,7 +117,7 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 		}
 
 	case PreOrder:
-		t.iterNext = func() (out *Node) {
+		t.iterNext = func() (out *RBNode) {
 			for len(stack) > 0 || current != nil {
 				if current != nil {
 					out = current
@@ -133,26 +139,23 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 			return out
 		}
 	case PostOrder:
-		if current == nil {
-			return current
-		}
 		stack = append(stack, current)
-		var prevNode *Node = nil
+		var prevRBNode *RBNode = nil
 
-		t.iterNext = func() (out *Node) {
+		t.iterNext = func() (out *RBNode) {
 			for len(stack) > 0 {
 				// peek
 				stackIndex := len(stack) - 1
 				current = stack[stackIndex]
-				if (prevNode == nil) ||
-					(prevNode.left == current) ||
-					(prevNode.right == current) {
+				if (prevRBNode == nil) ||
+					(prevRBNode.left == current) ||
+					(prevRBNode.right == current) {
 					if current.left != nil {
 						stack = append(stack, current.left)
 					} else if current.right != nil {
 						stack = append(stack, current.right)
 					}
-				} else if current.left == prevNode {
+				} else if current.left == prevRBNode {
 					if current.right != nil {
 						stack = append(stack, current.right)
 					}
@@ -161,10 +164,10 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 					// pop, but no assignment
 					stackIndex := len(stack) - 1
 					stack = stack[0:stackIndex]
-					prevNode = current
+					prevRBNode = current
 					break
 				}
-				prevNode = current
+				prevRBNode = current
 			}
 
 			// last node, reset
@@ -184,18 +187,18 @@ func (t *RBTree) InitIter(order TravOrder) *Node {
 }
 
 // Map is a more performance orientated way to iterate over the elements of the tree.
-// Given a TravOrder and a function which conforms to the IterFunc type:
+// Given a TravOrder and a function which conforms to the RBIterFunc type:
 //
-//      type IterFunc func(*Node)
+//      type RBIterFunc func(*RBNode)
 //
-// Map calls the function for each Node  in the specified order.
-func (t *RBTree) Map(order TravOrder, f IterFunc) {
+// Map calls the function for each RBNode  in the specified order.
+func (t *RBTree) Map(order TravOrder, f RBIterFunc) {
 
 	n := t.root
 	switch order {
 	case InOrder:
-		var inorder func(node *Node)
-		inorder = func(node *Node) {
+		var inorder func(node *RBNode)
+		inorder = func(node *RBNode) {
 			if node == nil {
 				return
 			}
@@ -205,8 +208,8 @@ func (t *RBTree) Map(order TravOrder, f IterFunc) {
 		}
 		inorder(n)
 	case PreOrder:
-		var preorder func(node *Node)
-		preorder = func(node *Node) {
+		var preorder func(node *RBNode)
+		preorder = func(node *RBNode) {
 			if node == nil {
 				return
 			}
@@ -216,8 +219,8 @@ func (t *RBTree) Map(order TravOrder, f IterFunc) {
 		}
 		preorder(n)
 	case PostOrder:
-		var postorder func(node *Node)
-		postorder = func(node *Node) {
+		var postorder func(node *RBNode)
+		postorder = func(node *RBNode) {
 			if node == nil {
 				return
 			}
@@ -237,11 +240,12 @@ func (t *RBTree) Map(order TravOrder, f IterFunc) {
 // a matching Interface element as based upon that types Compare function along wih a nil error.
 // If given an item which can't be successfully compared within the array, found is returned with a nil, and
 // error is set to InvalidInterfaceError.
-// If a search within the tree comes up empty, found is nil, but error is populated with a NonexistentElemError.
+// If a search within the tree comes up empty, found and err are nil.
 func (t *RBTree) Search(item Interface) (found Interface, err error) {
 	if item == nil {
 		var e InvalidInterfaceError
-		return nil, e
+		err = e
+		return
 	}
 	x := t.root
 	for x != nil {
@@ -251,11 +255,17 @@ func (t *RBTree) Search(item Interface) (found Interface, err error) {
 		case LT:
 			x = x.right
 		case EQ:
-			return x.Elem, nil
+			found = x.Elem
+			return
+		case NP:
+			var e UncompareableTypeError
+			e.this = x.Elem
+			e.that = item
+			err = e
+			return
 		}
 	}
-	var e NonexistentElemError
-	return nil, e
+	return
 }
 
 // Insert takes a type implementing the Interface interface, this type is then inserted into the
@@ -265,13 +275,14 @@ func (t *RBTree) Search(item Interface) (found Interface, err error) {
 // error is set to InvalidInterfaceError.
 func (t *RBTree) Insert(item Interface) (old Interface, err error) {
 	if item == nil {
-		var err InvalidInterfaceError
-		return nil, err
+		var e InvalidInterfaceError
+		err = e
+		return
 	}
 
 	if t.root == nil {
 		t.Size++
-		t.root = &Node{Elem: item, left: nil, right: nil}
+		t.root = &RBNode{Elem: item, left: nil, right: nil}
 		t.first = t.root
 		t.last = t.root
 	} else {
@@ -285,11 +296,11 @@ func (t *RBTree) Insert(item Interface) (old Interface, err error) {
 	return
 }
 
-func (t *RBTree) insert(h *Node, item Interface) (root *Node, old Interface) {
+func (t *RBTree) insert(h *RBNode, item Interface) (root *RBNode, old Interface) {
 	if h == nil {
 		t.Size++
 		// base case, insert do stuff on new node
-		n := &Node{Elem: item, left: nil, right: nil}
+		n := &RBNode{Elem: item, left: nil, right: nil}
 		// set Min
 		switch t.first.Elem.Compare(item) {
 		case GT:
@@ -300,7 +311,8 @@ func (t *RBTree) insert(h *Node, item Interface) (root *Node, old Interface) {
 		case LT:
 			t.last = n
 		}
-		return n, nil
+		root = n
+		return
 	}
 
 	switch h.Elem.Compare(item) {
@@ -323,20 +335,28 @@ func (t *RBTree) insert(h *Node, item Interface) (root *Node, old Interface) {
 	if h.left.isRed() && h.right.isRed() {
 		h.colorFlip()
 	}
-	return h, old
+	root = h
+	return
 }
 
 // Remove takes a type implementing the Interface interface, this type is then searched on inside the tree.
 // If a matching entry is found the item is removed from the tree and old is populated with said removed item. error is nil in this case.
 // If when searching within the tree comes up empty, old is nil, but error is populated with a NonexistentElemError.
 func (t *RBTree) Remove(item Interface) (old Interface, err error) {
-	if item == nil || t.root == nil {
-		var err InvalidInterfaceError
-		return nil, err
+	if item == nil {
+		var e InvalidInterfaceError
+		err = e
+		return
+	}
+	if t.root == nil {
+		var e NonexistentElemError
+		err = e
+		return
 	}
 	t.root, old, err = t.remove(t.root, item)
 	if err != nil {
-		return nil, err
+		old = nil
+		return
 	} else if old != nil {
 		if t.root == nil {
 			t.first = nil
@@ -346,12 +366,27 @@ func (t *RBTree) Remove(item Interface) (old Interface, err error) {
 			switch t.first.Elem.Compare(old) {
 			case EQ:
 				t.first = t.root.min()
+			case NP:
+				var e UncompareableTypeError
+				e.this = t.first.Elem
+				e.that = old
+				err = e
+				return
 			}
 			// set Max
 			switch t.last.Elem.Compare(old) {
 			case EQ:
 				t.last = t.root.max()
+
+			case NP:
+				var e UncompareableTypeError
+				e.this = t.last.Elem
+				e.that = old
+				old = nil
+				err = e
+				return
 			}
+
 		}
 	} else {
 
@@ -362,12 +397,12 @@ func (t *RBTree) Remove(item Interface) (old Interface, err error) {
 	} else if t.root == nil {
 		t.Height--
 	}
-	return old, nil
+	return
 
 }
 
 // TODO Test error returns
-func (t *RBTree) remove(h *Node, item Interface) (root *Node, old Interface, err error) {
+func (t *RBTree) remove(h *RBNode, item Interface) (root *RBNode, old Interface, err error) {
 
 	var e NonexistentElemError
 	switch h.Elem.Compare(item) {
@@ -376,9 +411,10 @@ func (t *RBTree) remove(h *Node, item Interface) (root *Node, old Interface, err
 			h = h.rotateRight()
 		}
 		if result := h.Elem.Compare(item); result == EQ && h.right == nil {
-			old = h.Elem
 			t.Size--
-			return nil, old, nil
+			old = h.Elem
+			root = nil
+			return
 		}
 		if h.right != nil {
 			if !h.right.isRed() && !(h.right.left.isRed()) {
@@ -404,17 +440,21 @@ func (t *RBTree) remove(h *Node, item Interface) (root *Node, old Interface, err
 				h = h.moveRedLeft()
 			}
 			h.left, old, err = t.remove(h.left, item)
-		} else {
-			err = e
 		}
+
+	case NP:
+		var e UncompareableTypeError
+		e.this = h.Elem
+		e.that = item
+		return h, old, err
 	}
-	h = h.fixUp()
-	return h, old, err
+	root = h.fixUp()
+	return
 }
 
 // Left Leaning Red Black Tree functions and helpers to maintain public methods
 
-func (h *Node) rotateLeft() (x *Node) {
+func (h *RBNode) rotateLeft() (x *RBNode) {
 	x = h.right
 	h.right = x.left
 	x.left = h
@@ -423,7 +463,7 @@ func (h *Node) rotateLeft() (x *Node) {
 	return
 }
 
-func (h *Node) rotateRight() (x *Node) {
+func (h *RBNode) rotateRight() (x *RBNode) {
 	x = h.left
 	h.left = x.right
 	x.right = h
@@ -432,11 +472,11 @@ func (h *Node) rotateRight() (x *Node) {
 	return
 }
 
-func (h *Node) isRed() bool {
+func (h *RBNode) isRed() bool {
 	return h != nil && h.color == Red
 }
 
-func (h *Node) moveRedLeft() *Node {
+func (h *RBNode) moveRedLeft() *RBNode {
 	h.colorFlip()
 	if h.right.left.isRed() {
 		h.right = h.right.rotateRight()
@@ -446,7 +486,7 @@ func (h *Node) moveRedLeft() *Node {
 	return h
 }
 
-func (h *Node) moveRedRight() *Node {
+func (h *RBNode) moveRedRight() *RBNode {
 	h.colorFlip()
 	if h.left.left.isRed() {
 		h = h.rotateRight()
@@ -455,13 +495,13 @@ func (h *Node) moveRedRight() *Node {
 	return h
 }
 
-func (h *Node) colorFlip() {
+func (h *RBNode) colorFlip() {
 	h.color = !h.color
 	h.left.color = !h.left.color
 	h.right.color = !h.right.color
 }
 
-func (h *Node) fixUp() *Node {
+func (h *RBNode) fixUp() *RBNode {
 	if h.right.isRed() {
 		h = h.rotateLeft()
 	}
@@ -474,18 +514,18 @@ func (h *Node) fixUp() *Node {
 	}
 	return h
 }
-func (h *Node) min() *Node {
+func (h *RBNode) min() *RBNode {
 	for ; h.left != nil; h = h.left {
 	}
 	return h
 }
-func (h *Node) max() *Node {
+func (h *RBNode) max() *RBNode {
 	for ; h.right != nil; h = h.right {
 	}
 	return h
 }
 
-func (h *Node) removeMin() *Node {
+func (h *RBNode) removeMin() *RBNode {
 	if h.left == nil {
 		return nil
 	}
