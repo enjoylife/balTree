@@ -62,13 +62,12 @@ func (d Balance) String() string {
 
 // Interface is a one method interface type.
 // Types which implement a Compare method can be inserted into a Tree.
-// Compare returns a Balance with respect to the total order between the method calle and its given
-// arguement.
+// Compare returns a Balance with respect to the total order between the method calle and its given arguement.
 // Given:
 //
 //      bal = calle.Compare(arg):
 //
-// The result of bal should follow this logic:
+// The result of bal must follow this logic:
 //
 //      if calle < arg {
 //          // ...
@@ -90,14 +89,16 @@ func (d Balance) String() string {
 //          // ...
 //          return // bal == NP
 //      }
+//
 // Think of Compare as asking the question, "what is the calle's relationship to arg?"
-// Is the calle less than arg, is it greater than, etc.
+// Is the calle less than arg? Is it greater than, etc.
 
 // To Insert a type into the RBTree it must implement this one method interface.
 type Interface interface {
 	Compare(Interface) Balance
 }
 
+// This is returned when a Interface's compare method returns a NP case.```
 type UncompareableTypeError struct {
 	this Interface
 	that Interface
@@ -107,6 +108,7 @@ func (e UncompareableTypeError) Error() string {
 	return fmt.Sprintf("gotree: Can not compare %T with the unkown type of %T", e.this, e.that)
 }
 
+// Returned when the Interface to be inserted, searched, removed, etc is nil or something uncomparable
 type InvalidInterfaceError string
 
 func (e InvalidInterfaceError) Error() string {
@@ -118,10 +120,3 @@ type NonexistentElemError string
 func (e NonexistentElemError) Error() string {
 	return "gotree: Could not find requested Elem."
 }
-
-// A function we can give to our iterators to work with our stored types.
-// EX:
-//     func printNode(n *Node}) {
-//         fmt.Printf("ElementType: %T, ElementValue: %v\n", n.Elem,n.Elem)
-//     }
-type IterFunc func(*Node)
