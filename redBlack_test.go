@@ -2,7 +2,6 @@ package gotree
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -11,138 +10,12 @@ import (
 func init() {
 }
 
-var _ = spew.Dump
-
 var _ = fmt.Printf
 
-const (
-	searchTotal = 1000000
-	searchSpace = searchTotal / 2
-	iters       = 10000
-)
-
-type exInt int
-
-func (this exInt) Compare(b Interface) Balance {
-	switch that := b.(type) {
-	case exInt:
-		switch result := int(this - that); {
-		case result > 0:
-			return GT
-		case result < 0:
-			return LT
-		case result == 0:
-			return EQ
-		default:
-			return NP
-		}
-	case exStruct:
-		switch result := int(this) - that.M; {
-		case result > 0:
-			return GT
-		case result < 0:
-			return LT
-		case result == 0:
-			return EQ
-		default:
-			return NP
-		}
-
-	default:
-		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
-		panic(s)
-	}
-
-}
-
-type exString string
-
-func (this exString) Compare(b Interface) Balance {
-	switch that := b.(type) {
-	case exString:
-		a := string(this)
-		b := string(that)
-		min := len(b)
-		if len(a) < len(b) {
-			min = len(a)
-		}
-		diff := 0
-		for i := 0; i < min && diff == 0; i++ {
-			diff = int(a[i]) - int(b[i])
-		}
-		if diff == 0 {
-			diff = len(a) - len(b)
-		}
-
-		switch result := diff; {
-		case result > 0:
-			return GT
-		case result < 0:
-			return LT
-		case result == 0:
-			return EQ
-		default:
-			return NP
-		}
-	case exInt:
-		a, _ := strconv.Atoi(string(this))
-		switch result := a - int(that); {
-		case result > 0:
-			return GT
-		case result < 0:
-			return LT
-		case result == 0:
-			return EQ
-		default:
-			return NP
-		}
-
-	default:
-		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
-		panic(s)
-	}
-}
-
-type exStruct struct {
-	M int
-	S string
-}
-
-func (this exStruct) Compare(b Interface) Balance {
-	switch that := b.(type) {
-	case exStruct:
-		switch result := int(this.M - that.M); {
-		case result > 0:
-			return GT
-		case result < 0:
-			return LT
-		case result == 0:
-			return EQ
-		default:
-			return NP
-		}
-	case exInt:
-		switch result := this.M - int(that); {
-		case result > 0:
-			return GT
-		case result < 0:
-			return LT
-		case result == 0:
-			return EQ
-		default:
-			return NP
-		}
-	default:
-		return NP
-		s := fmt.Sprintf("Can not compare to the unkown type of %T", that)
-		panic(s)
-	}
-}
-
 /* Helpers for tree traversal and testing tree properties */
-func printNode(n *Node) {
-	x := n.Elem
-	fmt.Println("Elem:", x)
+func printRBNode(n *RBNode) {
+	//x := n.Elem
+	//fmt.Println("Elem:", x)
 }
 
 func isBalanced(t *RBTree) bool {
@@ -159,7 +32,7 @@ func isBalanced(t *RBTree) bool {
 	return nodeIsBalanced(t.root, black) && t.Height == black
 }
 
-func nodeIsBalanced(n *Node, black int) bool {
+func nodeIsBalanced(n *RBNode, black int) bool {
 	if n == nil && black == 0 {
 		return true
 	} else if n == nil && black != 0 {
@@ -171,10 +44,10 @@ func nodeIsBalanced(n *Node, black int) bool {
 	return nodeIsBalanced(n.left, black) && nodeIsBalanced(n.right, black)
 }
 
-// can only be used for exInt
-func inc(t *testing.T) func(n *Node) {
+// Max, Min Size tests
+func inc(t *testing.T) func(n *RBNode) {
 	var prior int = -1
-	return func(n *Node) {
+	return func(n *RBNode) {
 		if prior < int(n.Elem.(exInt)) {
 			//fmt.Println("VALUE: ", value.(int))
 			prior = int(n.Elem.(exInt))
@@ -228,6 +101,7 @@ func TestSizeInsert(t *testing.T) {
 
 }
 
+// Error return tests
 func TestErrorInsert(t *testing.T) {
 	t.Parallel()
 
@@ -241,6 +115,8 @@ func TestErrorInsert(t *testing.T) {
 		t.Errorf("Error should be of type InvalidInterfaceError")
 	}
 }
+
+// Edge case tests for insert
 func TestBasicInsert(t *testing.T) {
 
 	t.Parallel()
@@ -290,6 +166,8 @@ func TestRandomInsert(t *testing.T) {
 	t.Parallel()
 	r := rand.New(rand.NewSource(int64(5)))
 	tree := &RBTree{}
+
+	tree.Map(PostOrder, printRBNode)
 	for i := 0; i < iters; i++ {
 		item := r.Int()
 		tree.Insert(exInt(item))
@@ -300,37 +178,20 @@ func TestRandomInsert(t *testing.T) {
 	tree.Map(InOrder, inc(t))
 }
 
-func BenchmarkMapInsert(b *testing.B) {
-
-	b.StopTimer()
-	r := rand.New(rand.NewSource(int64(5)))
-	m := make(map[int]int)
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		a := r.Int()
-		m[a] = a
-	}
-
-}
-func BenchmarkInsert(b *testing.B) {
-
-	b.StopTimer()
-	tree := &RBTree{}
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		tree.Insert(exInt(b.N - i))
-	}
-
-}
-
 func TestSearch(t *testing.T) {
 
 	t.Parallel()
 	tree := &RBTree{}
+
+	_, ok := tree.Search(exInt(1))
+	if ok != nil {
+		t.Errorf("Not minding empty tree")
+	}
+
 	for i := 0; i < iters; i++ {
 		tree.Insert(exInt(i))
 	}
-	_, ok := tree.Search(nil)
+	_, ok = tree.Search(nil)
 	if ok == nil {
 		t.Errorf("Not minding nil key's")
 	}
@@ -348,7 +209,7 @@ func TestSearch(t *testing.T) {
 
 	for i := iters; i < iters+1000; i++ {
 		value, ok := tree.Search(exInt(i))
-		if _, ok := ok.(NonexistentElemError); !ok {
+		if ok != nil {
 			t.Errorf("values should not be present")
 		}
 		if value != nil {
@@ -357,8 +218,62 @@ func TestSearch(t *testing.T) {
 	}
 }
 
-// TODO Test error returns
+// remove, min and max tests
+func TestRemove(t *testing.T) {
 
+	t.Parallel()
+	var old Interface
+	var check error
+	tree := &RBTree{}
+
+	old, check = tree.Remove(nil)
+	if _, ok := check.(InvalidInterfaceError); !ok || old != nil {
+		t.Errorf("Should Not be able to remove nil")
+		t.Errorf("Error should be of type InvalidInterfaceError")
+	}
+
+	item1 := exStruct{0, "0"}
+	old, check = tree.Remove(exStruct{0, "1"})
+	if old != nil || check == nil {
+		fmt.Println(old)
+		fmt.Println(check)
+		fmt.Println(item1)
+		t.Errorf("Not minding empty tree.")
+	}
+
+	tree.Insert(item1)
+	old, check = tree.Remove(exStruct{0, "1"})
+	if old != item1 || check != nil {
+		fmt.Println(old)
+		fmt.Println(item1)
+		t.Errorf("Can't even remove simple root")
+	}
+
+	max := 100
+	for i := 0; i < max; i++ {
+		tree.Insert(exStruct{i, strconv.Itoa(i)})
+	}
+	for i := max; i < max*2; i++ {
+		old, check = tree.Remove(exStruct{i, strconv.Itoa(i)})
+		if old != nil || check == nil {
+			fmt.Println(old)
+			fmt.Println(check)
+			t.Errorf("Can't  ignore nonexisitant elements in remove.")
+		}
+		black := 0
+		for x := tree.root; x != nil; x = x.left {
+			if x.color == Black {
+				black++
+			}
+		}
+
+		if !isBalanced(tree) {
+			fmt.Println("Height", tree.Height)
+			fmt.Println("Calc Height", black)
+			t.Errorf("Tree is not balanced")
+		}
+	}
+}
 func TestMaxRemove(t *testing.T) {
 	t.Parallel()
 	tree := &RBTree{}
@@ -433,38 +348,20 @@ func TestSizeRemove(t *testing.T) {
 
 	}
 }
-func TestRemove(t *testing.T) {
+func TestRandomRemove(t *testing.T) {
 
 	t.Parallel()
-	var old Interface
-	var check error
 	tree := &RBTree{}
-
-	old, check = tree.Remove(nil)
-	if _, ok := check.(InvalidInterfaceError); !ok || old != nil {
-		t.Errorf("Should Not be able to remove nil")
-		t.Errorf("Error should be of type InvalidInterfaceError")
-	}
-	item1 := exStruct{0, "0"}
-	tree.Insert(item1)
-	old, check = tree.Remove(exStruct{0, "1"})
-	if old != item1 || check != nil {
-		fmt.Println(old)
-		fmt.Println(item1)
-		t.Errorf("Can't even remove simple root")
+	r := rand.New(rand.NewSource(int64(5)))
+	m := make(map[int]int)
+	for i := 0; i < iters; i++ {
+		a := r.Intn(searchSpace)
+		m[a] = a
+		tree.Insert(exInt(a))
 	}
 
-	max := 100
-	for i := 0; i < max; i++ {
-		tree.Insert(exStruct{i, strconv.Itoa(i)})
-	}
-	for i := max; i < max*2; i++ {
-		old, check = tree.Remove(exStruct{i, strconv.Itoa(i)})
-		if old != nil || check == nil {
-			fmt.Println(old)
-			fmt.Println(check)
-			t.Errorf("Can't  ignore nonexisitant elements in remove.")
-		}
+	for _, value := range m {
+		tree.Remove(exInt(value))
 		black := 0
 		for x := tree.root; x != nil; x = x.left {
 			if x.color == Black {
@@ -480,6 +377,7 @@ func TestRemove(t *testing.T) {
 	}
 }
 
+// iteration and map tests
 func TestIterIn(t *testing.T) {
 
 	t.Parallel()
@@ -493,7 +391,7 @@ func TestIterIn(t *testing.T) {
 	if !isBalanced(tree) {
 		t.Errorf("Tree is not balanced")
 	}
-	var check *Node
+	var check *RBNode
 	if check = tree.Next(); check != nil {
 		t.Errorf("Didn't avoid a non intialized next call")
 	}
@@ -558,13 +456,7 @@ func TestIterIn(t *testing.T) {
 	if tree.iterNext != nil {
 		t.Errorf("Didn't reset iter")
 	}
-
-	//tree.Map(PreOrder, printNode)
-	//scs := spew.ConfigState{Indent: "\t"}
-	//scs.Dump(tree.root)
-
 }
-
 func TestTraversal(t *testing.T) {
 	t.Parallel()
 
@@ -576,8 +468,7 @@ func TestTraversal(t *testing.T) {
 	if !isBalanced(tree) {
 		t.Errorf("Tree is not balanced")
 	}
-	//tree.Map(InOrder, printNode)
-
+	//tree.Map(InOrder, printRBNode)
 }
 
 func BenchmarkSearch(b *testing.B) {
@@ -597,6 +488,31 @@ func BenchmarkSearch(b *testing.B) {
 		a := r.Intn(searchSpace)
 		tree.Search(exInt(a))
 	}
+}
+
+func BenchmarkMapInsert(b *testing.B) {
+
+	b.StopTimer()
+	//r := rand.New(rand.NewSource(int64(5)))
+	//m := make(map[int]int)
+	m := make(map[int]exInt)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		//a := r.Int()
+		//m[a] = a
+		m[i] = (exInt(b.N - i))
+	}
+
+}
+func BenchmarkInsert(b *testing.B) {
+
+	b.StopTimer()
+	tree := &RBTree{}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		tree.Insert(exInt(b.N - i))
+	}
+
 }
 
 func BenchmarkRemove(b *testing.B) {
@@ -671,13 +587,14 @@ func BenchmarkIterPostOrder(b *testing.B) {
 
 }
 
-func recurse() func(n *Node) {
+func recurse() func(n *RBNode) {
 	var sum int = 0
-	return func(n *Node) {
+	return func(n *RBNode) {
 		sum += int(n.Elem.(exInt))
 	}
 }
-func BenchmarkRecurseMapInorderOrder(b *testing.B) {
+
+func BenchmarkMapInOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
@@ -693,7 +610,7 @@ func BenchmarkRecurseMapInorderOrder(b *testing.B) {
 	}
 
 }
-func BenchmarkRecurseMapPreorderOrder(b *testing.B) {
+func BenchmarkMapPreOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
@@ -709,7 +626,7 @@ func BenchmarkRecurseMapPreorderOrder(b *testing.B) {
 	}
 
 }
-func BenchmarkRecurseMapPostOrder(b *testing.B) {
+func BenchmarkMapPostOrder(b *testing.B) {
 
 	b.StopTimer()
 	r := rand.New(rand.NewSource(int64(5)))
