@@ -1,1 +1,1 @@
-TODO: scapegoat, treap, avl, splay
+TODO:treap, splay
