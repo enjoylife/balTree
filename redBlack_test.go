@@ -215,10 +215,22 @@ func TestRemove(t *testing.T) {
 		fmt.Println(item1)
 		t.Errorf("Can't even remove simple root")
 	}
+	old = tree.Search(exStruct{0, "1"})
+	if old != nil {
+		t.Errorf("Did not actually remove")
+	}
 
 	max := 100
 	for i := 0; i < max; i++ {
 		tree.Insert(exStruct{i, strconv.Itoa(i)})
+	}
+
+	for i := 0; i < max; i++ {
+		tree.Remove(exStruct{i, strconv.Itoa(i)})
+		old = tree.Search(exStruct{0, "1"})
+		if old != nil {
+			t.Errorf("Did not actually remove")
+		}
 	}
 	for i := max; i < max*2; i++ {
 		old = tree.Remove(exStruct{i, strconv.Itoa(i)})
