@@ -15,7 +15,6 @@ var _ = fmt.Printf
 
 func TestSplayBasicInsert(t *testing.T) {
 
-	t.Parallel()
 	var old Interface
 	items := []exStruct{exStruct{0, "0"},
 		exStruct{2, "2"}, exStruct{2, "3"}}
@@ -52,6 +51,10 @@ func TestSplayInsert(t *testing.T) {
 		if old != nil {
 			t.Errorf("Old should be nil")
 		}
+		old = tree.Insert(exInt(i))
+		if old != exInt(i) {
+			t.Errorf("Old should match")
+		}
 
 	}
 	//fmt.Println(tree.Height())
@@ -59,17 +62,20 @@ func TestSplayInsert(t *testing.T) {
 
 func TestSplaySearch(t *testing.T) {
 
-	t.Parallel()
 	tree := &SplayTree{}
+
+	x := tree.Search(nil)
+	if x != nil {
+		t.Errorf("Not minding empty tree")
+	}
 	for i := 0; i < iters; i++ {
 		tree.Insert(exInt(i))
 	}
-	x := tree.Search(nil)
+	x = tree.Search(nil)
 	if x != nil {
 		t.Errorf("Not minding nil key's")
 	}
 
-	//tree.Map(InOrder, inc(t))
 	for i := 0; i < iters; i++ {
 		value := tree.Search(exInt(i))
 		if int(value.(exInt)) != i {
@@ -96,9 +102,112 @@ func BenchmarkSplayInsert(b *testing.B) {
 
 }
 
+func TestSplayRemove(t *testing.T) {
+
+	tree := &SplayTree{}
+	c := tree.Remove(exInt(0))
+	if c != nil {
+		t.Errorf("Not respecting empty tree.")
+	}
+	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
+	for _, v := range items {
+		tree.Insert(exString(v))
+	}
+	for k, v := range items {
+		check := tree.Remove(exString(v))
+		if check != exString(v) {
+			fmt.Println(check)
+			t.Errorf("Not getting removed item back")
+		}
+		check = tree.Search(exString(v))
+		if check != nil {
+			t.Errorf("Didn't really remove")
+		}
+
+		for i, n := k+1, tree.IterInit(InOrder); n != nil; i, n = i+1, tree.Next() {
+			if items[i] != string(n.Elem.(exString)) {
+				t.Errorf("Other elems deleted Got:%s, Exp: %s", n.Elem, items[i])
+			}
+		}
+	}
+}
+func TestSplayMaxRemove(t *testing.T) {
+	t.Parallel()
+	tree := &RBTree{}
+
+	for i := 0; i < iters; i++ {
+		tree.Insert(exInt(i))
+		if tree.Max() != exInt(i) {
+			t.Errorf("Max not updateing")
+		}
+	}
+	for i := iters; i > 0; i-- {
+		tree.Remove(exInt(i))
+		if tree.Max() != exInt(i-1) {
+			fmt.Println(tree.Max())
+			t.Errorf("Max not updateing")
+		}
+	}
+	tree.Remove(exInt(0))
+	if tree.Max() != nil {
+		fmt.Println(tree.Max())
+		t.Errorf("Max not updateing")
+	}
+
+}
+func TestSplayMinRemove(t *testing.T) {
+	t.Parallel()
+	tree := &RBTree{}
+	var old Interface
+	var check error
+
+	for i := iters; i >= 0; i-- {
+		tree.Insert(exInt(i))
+		if tree.Min() != exInt(i) {
+			fmt.Println(tree.Min())
+			t.Errorf("Min not updateing")
+		}
+	}
+	for i := 0; i < iters; i++ {
+
+		old = tree.Remove(exInt(i))
+		if old == nil {
+			fmt.Println("old", old)
+			fmt.Println(check)
+			t.Errorf("Not giving back old value")
+		}
+		if tree.Min() != exInt(i+1) {
+			fmt.Println(tree.Min())
+			t.Errorf("Min not updateing")
+		}
+	}
+
+	tree.Remove(exInt(iters))
+	if tree.Min() != nil {
+		fmt.Println(tree.Min())
+		t.Errorf("Min not working")
+	}
+}
+func TestSplaySizeRemove(t *testing.T) {
+	t.Parallel()
+	tree := &RBTree{}
+
+	for i := iters; i >= 0; i-- {
+		tree.Insert(exInt(i))
+	}
+
+	for i := 0; i < iters; i++ {
+		tree.Remove(exInt(i))
+		if tree.Size != (iters - i) {
+			fmt.Println(tree.Size)
+			t.Errorf("Size on remove not working")
+		}
+
+	}
+}
+
 func TestSplayIterIn(t *testing.T) {
 
-	t.Parallel()
 	tree := &SplayTree{}
 	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
 	for _, v := range items {
@@ -132,8 +241,5 @@ func TestSplayIterIn(t *testing.T) {
 	if tree.iterNext != nil {
 		t.Errorf("Didn't reset iter")
 	}
-
-	//scs := spew.ConfigState{Indent: "\t"}
-	//scs.Dump(tree.root)
 
 }
