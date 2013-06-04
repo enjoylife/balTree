@@ -20,7 +20,7 @@ type SplayTree struct {
 
 // Search returns the matching item if found, otherwise nil is returned.
 func (t *SplayTree) Search(item Interface) (found Interface) {
-	if item == nil {
+	if item == nil || t.root == nil {
 		return
 	}
 	t.root = t.root.splay(item)
@@ -84,27 +84,35 @@ func (t *SplayTree) Remove(item Interface) (old Interface) {
 	}
 
 	t.root = t.root.splay(item)
+
 	switch t.root.Elem.Compare(item) {
 	// TODO NP case
 	case EQ:
 		old = t.root.Elem
 		if t.root.left == nil {
-			x = t.root.left
+			x = t.root.right
 		} else {
 			x = t.root.left.splay(item)
 			x.right = t.root.right
 		}
+		t.root = x
 		t.Size--
-		// set Min
-		switch t.first.Elem.Compare(old) {
-		case EQ:
-			t.first = t.root.min()
+		if t.root != nil {
+			// set Min
+			switch t.first.Elem.Compare(old) {
+			case EQ:
+				t.first = t.root.min()
+			}
+			// set Max
+			switch t.last.Elem.Compare(old) {
+			case EQ:
+				t.last = t.root.max()
+			}
+		} else {
+			t.first = nil
+			t.last = nil
 		}
-		// set Max
-		switch t.last.Elem.Compare(old) {
-		case EQ:
-			t.last = t.root.max()
-		}
+
 	}
 	return old
 
@@ -310,6 +318,7 @@ func (t *SplayTree) Height() int {
 		if n == nil {
 			return 0
 		}
+		// math.Max for int
 		if a, b := calc(n.left), calc(n.right); a >= b {
 			return 1 + a
 		} else {
