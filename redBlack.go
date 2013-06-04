@@ -41,7 +41,7 @@ type RBTree struct {
 	root        *RBNode
 }
 
-// A function we can give to our iterators to work with our stored types.
+// RBIterFunc is function we can give to our iterators to work with our stored types.
 // EX:
 //     func printRBNode(n *RBNode}) {
 //         fmt.Printf("ElementType: %T, ElementValue: %v\n", n.Elem,n.Elem)
@@ -145,7 +145,7 @@ func (t *RBTree) IterInit(order TravOrder) *RBNode {
 		}
 	case PostOrder:
 		stack = append(stack, current)
-		var prevRBNode *RBNode = nil
+		var prevRBNode *RBNode
 
 		t.iterNext = func() (out *RBNode) {
 			for len(stack) > 0 {
@@ -373,6 +373,7 @@ func (t *RBTree) remove(h *RBNode, item Interface) (root *RBNode, old Interface)
 		if result := h.Elem.Compare(item); result == EQ && h.right == nil {
 			t.Size--
 			old = h.Elem
+			h = nil
 			root = nil
 			return
 		}
