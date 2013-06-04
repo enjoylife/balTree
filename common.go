@@ -2,6 +2,19 @@ package gotree
 
 import ()
 
+type Tree interface {
+	Search(item Interface) (found Interface)
+	Insert(item Interface) (old Interface)
+	Remove(item Interface) (old Interface)
+
+	Height() int
+	Min() Interface
+	Max() Interface
+
+	IterInit(order TravOrder) Interface
+	Next() Interface
+}
+
 // Our possible tree traversal ablitites
 type TravOrder int
 
