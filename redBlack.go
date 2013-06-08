@@ -2,6 +2,7 @@ package gotree
 
 import (
 	"fmt"
+	"runtime"
 )
 
 // Color is the used to maintain the redblack tree balance.
@@ -35,22 +36,26 @@ type RBNode struct {
 // A RBTree is our main type our redblack tree methods are defined on.
 type RBTree struct {
 	height      int // height from root to leaf
-	Size        int // Number of inserted elements
+	size        int // Number of inserted elements
 	first, last *RBNode
-	iterNext    func() *RBNode // initially nil
+	iterNext    func() Interface // initially nil
 	root        *RBNode
 }
-
-// RBIterFunc is function we can give to our iterators to work with our stored types.
-// EX:
-//     func printRBNode(n *RBNode}) {
-//         fmt.Printf("ElementType: %T, ElementValue: %v\n", n.Elem,n.Elem)
-//     }
-type RBIterFunc func(*RBNode)
 
 // Height returns the max depth of any branch of the tree
 func (t *RBTree) Height() int {
 	return t.height
+}
+func (t *RBTree) Size() int {
+	return t.size
+}
+func (t *RBTree) Clear() {
+	t.root = nil
+	t.last = nil
+	t.first = nil
+	t.size = 0
+	t.height = 0
+	runtime.GC()
 }
 
 // Min returns the smallest inserted element if possible. If the smallest value is not
@@ -82,7 +87,7 @@ func (t *RBTree) Max() Interface {
 //    }
 // Note: If one was to break out of the loop prior to a complete traversal,
 // and start another loop without calling IterInit, then the previously uncompleted iterator is continued again.
-func (t *RBTree) Next() *RBNode {
+func (t *RBTree) Next() Interface {
 
 	if t.iterNext == nil {
 		return nil
@@ -93,13 +98,13 @@ func (t *RBTree) Next() *RBNode {
 
 // IterInit is the initializer which setups the tree for iterating over it's elements in
 // a specific order. It setups the internal data, and then returns the first RBNode to be looked at. See Next for an example.
-func (t *RBTree) IterInit(order TravOrder) *RBNode {
+func (t *RBTree) IterInit(order TravOrder) Interface {
 
 	current := t.root
 	stack := []*RBNode{}
 	switch order {
 	case InOrder:
-		t.iterNext = func() (out *RBNode) {
+		t.iterNext = func() (out Interface) {
 			for len(stack) > 0 || current != nil {
 				if current != nil {
 					stack = append(stack, current)
@@ -107,8 +112,8 @@ func (t *RBTree) IterInit(order TravOrder) *RBNode {
 				} else {
 					// pop
 					stackIndex := len(stack) - 1
-					out = stack[stackIndex]
-					current = out
+					current = stack[stackIndex]
+					out = current.Elem
 					stack = stack[0:stackIndex]
 					current = current.right
 					break
@@ -122,10 +127,10 @@ func (t *RBTree) IterInit(order TravOrder) *RBNode {
 		}
 
 	case PreOrder:
-		t.iterNext = func() (out *RBNode) {
+		t.iterNext = func() (out Interface) {
 			for len(stack) > 0 || current != nil {
 				if current != nil {
-					out = current
+					out = current.Elem
 					stack = append(stack, current.right)
 					current = current.left
 					break
@@ -147,7 +152,7 @@ func (t *RBTree) IterInit(order TravOrder) *RBNode {
 		stack = append(stack, current)
 		var prevRBNode *RBNode
 
-		t.iterNext = func() (out *RBNode) {
+		t.iterNext = func() (out Interface) {
 			for len(stack) > 0 {
 				// peek
 				stackIndex := len(stack) - 1
@@ -165,7 +170,7 @@ func (t *RBTree) IterInit(order TravOrder) *RBNode {
 						stack = append(stack, current.right)
 					}
 				} else {
-					out = current
+					out = current.Elem
 					// pop, but no assignment
 					stackIndex := len(stack) - 1
 					stack = stack[0:stackIndex]
@@ -192,12 +197,12 @@ func (t *RBTree) IterInit(order TravOrder) *RBNode {
 }
 
 // Map is a more performance orientated way to iterate over the elements of the tree.
-// Given a TravOrder and a function which conforms to the RBIterFunc type:
+// Given a TravOrder and a function which conforms to the IterFunc type:
 //
-//      type RBIterFunc func(*RBNode)
+//      type IterFunc func(*RBNode)
 //
 // Map calls the function for each RBNode  in the specified order.
-func (t *RBTree) Map(order TravOrder, f RBIterFunc) {
+func (t *RBTree) Map(order TravOrder, f IterFunc) {
 
 	n := t.root
 	switch order {
@@ -208,7 +213,7 @@ func (t *RBTree) Map(order TravOrder, f RBIterFunc) {
 				return
 			}
 			inorder(node.left)
-			f(node)
+			f(node.Elem)
 			inorder(node.right)
 		}
 		inorder(n)
@@ -218,7 +223,7 @@ func (t *RBTree) Map(order TravOrder, f RBIterFunc) {
 			if node == nil {
 				return
 			}
-			f(node)
+			f(node.Elem)
 			preorder(node.left)
 			preorder(node.right)
 		}
@@ -231,7 +236,7 @@ func (t *RBTree) Map(order TravOrder, f RBIterFunc) {
 			}
 			postorder(node.left)
 			postorder(node.right)
-			f(node)
+			f(node.Elem)
 		}
 		postorder(n)
 	default:
@@ -268,7 +273,7 @@ func (t *RBTree) Insert(item Interface) (old Interface) {
 	}
 
 	if t.root == nil {
-		t.Size++
+		t.size++
 		t.root = &RBNode{Elem: item, left: nil, right: nil}
 		t.first = t.root
 		t.last = t.root
@@ -285,7 +290,7 @@ func (t *RBTree) Insert(item Interface) (old Interface) {
 
 func (t *RBTree) insert(h *RBNode, item Interface) (root *RBNode, old Interface) {
 	if h == nil {
-		t.Size++
+		t.size++
 		// base case, insert do stuff on new node
 		n := &RBNode{Elem: item, left: nil, right: nil}
 		// set Min
@@ -371,7 +376,7 @@ func (t *RBTree) remove(h *RBNode, item Interface) (root *RBNode, old Interface)
 			h = h.rotateRight()
 		}
 		if result := h.Elem.Compare(item); result == EQ && h.right == nil {
-			t.Size--
+			t.size--
 			old = h.Elem
 			h = nil
 			root = nil
@@ -383,7 +388,7 @@ func (t *RBTree) remove(h *RBNode, item Interface) (root *RBNode, old Interface)
 			}
 			if result := h.Elem.Compare(item); result == EQ {
 				old = h.Elem
-				t.Size--
+				t.size--
 
 				x := h.right.min()
 				h.Elem = x.Elem

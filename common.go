@@ -10,6 +10,7 @@ type Tree interface {
 	Clear()
 	Size() int
 	Height() int
+
 	Min() Interface
 	Max() Interface
 
@@ -17,6 +18,13 @@ type Tree interface {
 	Next() Interface
 	Map(order TravOrder, f IterFunc)
 }
+
+// IterFunc is function we can give to our iterators to work with our stored types.
+// EX:
+//     func printRBNode(n *RBNode}) {
+//         fmt.Printf("ElementType: %T, ElementValue: %v\n", n.Elem,n.Elem)
+//     }
+type IterFunc func(Interface)
 
 // Our possible tree traversal ablitites
 type TravOrder int
@@ -102,28 +110,7 @@ func (d Balance) String() string {
 type Interface interface {
 	Compare(Interface) Balance
 }
-
-/*
-// This is returned when a Interface's compare method returns a NP case.```
-type UncompareableTypeError struct {
-	this Interface
-	that Interface
+type Byte interface {
+	Interface
+	ToBytes() []byte
 }
-
-func (e UncompareableTypeError) Error() string {
-	return fmt.Sprintf("gotree: Can not compare %T with the unkown type of %T", e.this, e.that)
-}
-
-// Returned when the Interface to be inserted, searched, removed, etc is nil or something uncomparable
-type InvalidInterfaceError string
-
-func (e InvalidInterfaceError) Error() string {
-	return ("gotree: Can't use nil as item to search for.")
-}
-
-type NonexistentElemError string
-
-func (e NonexistentElemError) Error() string {
-	return "gotree: Could not find requested Elem."
-}
-*/

@@ -2,6 +2,7 @@ package gotree
 
 import (
 	"fmt"
+	"runtime"
 )
 
 var _ = fmt.Printf
@@ -12,10 +13,18 @@ type SplayNode struct {
 }
 
 type SplayTree struct {
-	Size        int // Number of inserted elements
+	size        int // Number of inserted elements
 	first, last *SplayNode
-	iterNext    func() *SplayNode // initially nil
+	iterNext    func() Interface // initially nil
 	root        *SplayNode
+}
+
+func (t *SplayTree) Clear() {
+	t.root = nil
+	t.last = nil
+	t.first = nil
+	t.size = 0
+	runtime.GC()
 }
 
 // Search returns the matching item if found, otherwise nil is returned.
@@ -40,7 +49,7 @@ func (t *SplayTree) Insert(item Interface) (old Interface) {
 	}
 
 	if t.root == nil {
-		t.Size++
+		t.size++
 		t.root = &SplayNode{Elem: item, left: nil, right: nil}
 		t.first = t.root
 		t.last = t.root
@@ -52,12 +61,12 @@ func (t *SplayTree) Insert(item Interface) (old Interface) {
 		n = &SplayNode{Elem: item, left: t.root.left, right: t.root}
 		t.root.left = nil
 		t.root = n
-		t.Size++
+		t.size++
 	case LT:
 		n = &SplayNode{Elem: item, left: t.root, right: t.root.right}
 		t.root.right = nil
 		t.root = n
-		t.Size++
+		t.size++
 	case EQ:
 		old = t.root.Elem
 		t.root.Elem = item
@@ -96,7 +105,7 @@ func (t *SplayTree) Remove(item Interface) (old Interface) {
 			x.right = t.root.right
 		}
 		t.root = x
-		t.Size--
+		t.size--
 		if t.root != nil {
 			// set Min
 			switch t.first.Elem.Compare(old) {
@@ -136,8 +145,6 @@ func (t *SplayTree) Max() Interface {
 	return nil
 }
 
-type SplayIterFunc func(*SplayNode)
-
 // Next is called when individual elements are wanted to be traversed over.
 // Prior to a call to Next, a call to IterInit needs to be made to set up the necessary
 // data to allow for traversal of the tree. Example:
@@ -149,7 +156,7 @@ type SplayIterFunc func(*SplayNode)
 //    }
 // Note: If one was to break out of the loop prior to a complete traversal,
 // and start another loop without calling IterInit, then the previously uncompleted iterator is continued again.
-func (t *SplayTree) Next() *SplayNode {
+func (t *SplayTree) Next() Interface {
 
 	if t.iterNext == nil {
 		return nil
@@ -160,13 +167,13 @@ func (t *SplayTree) Next() *SplayNode {
 
 // IterInit is the initializer which setups the tree for iterating over it's elements in
 // a specific order. It setups the internal data, and then returns the first SplayNode to be looked at. See Next for an example.
-func (t *SplayTree) IterInit(order TravOrder) *SplayNode {
+func (t *SplayTree) IterInit(order TravOrder) Interface {
 
 	current := t.root
 	stack := []*SplayNode{}
 	switch order {
 	case InOrder:
-		t.iterNext = func() (out *SplayNode) {
+		t.iterNext = func() (out Interface) {
 			for len(stack) > 0 || current != nil {
 				if current != nil {
 					stack = append(stack, current)
@@ -174,8 +181,8 @@ func (t *SplayTree) IterInit(order TravOrder) *SplayNode {
 				} else {
 					// pop
 					stackIndex := len(stack) - 1
-					out = stack[stackIndex]
-					current = out
+					current = stack[stackIndex]
+					out = current.Elem
 					stack = stack[0:stackIndex]
 					current = current.right
 					break
@@ -187,71 +194,6 @@ func (t *SplayTree) IterInit(order TravOrder) *SplayNode {
 			}
 			return out
 		}
-
-	case PreOrder:
-		t.iterNext = func() (out *SplayNode) {
-			for len(stack) > 0 || current != nil {
-				if current != nil {
-					out = current
-					stack = append(stack, current.right)
-					current = current.left
-					break
-				} else {
-					// pop
-					stackIndex := len(stack) - 1
-					current = stack[stackIndex]
-					stack = stack[0:stackIndex]
-				}
-			}
-
-			// last node, reset
-			if out == nil {
-				t.iterNext = nil
-			}
-			return out
-		}
-	case PostOrder:
-		if current == nil {
-			return current
-		}
-		stack = append(stack, current)
-		var prevSplayNode *SplayNode = nil
-
-		t.iterNext = func() (out *SplayNode) {
-			for len(stack) > 0 {
-				// peek
-				stackIndex := len(stack) - 1
-				current = stack[stackIndex]
-				if (prevSplayNode == nil) ||
-					(prevSplayNode.left == current) ||
-					(prevSplayNode.right == current) {
-					if current.left != nil {
-						stack = append(stack, current.left)
-					} else if current.right != nil {
-						stack = append(stack, current.right)
-					}
-				} else if current.left == prevSplayNode {
-					if current.right != nil {
-						stack = append(stack, current.right)
-					}
-				} else {
-					out = current
-					// pop, but no assignment
-					stackIndex := len(stack) - 1
-					stack = stack[0:stackIndex]
-					prevSplayNode = current
-					break
-				}
-				prevSplayNode = current
-			}
-
-			// last node, reset
-			if out == nil {
-				t.iterNext = nil
-			}
-			return out
-
-		}
 	default:
 		s := fmt.Sprintf("rbSplayTree has not implemented %s for iteration.", order)
 		panic(s)
@@ -262,13 +204,16 @@ func (t *SplayTree) IterInit(order TravOrder) *SplayNode {
 }
 
 // Map is a more performance orientated way to iterate over the elements of the tree.
-// Given a TravOrder and a function which conforms to the RBSplayIterFunc type:
+// Given a TravOrder and a function which conforms to the RBIterFunc type:
 //
-//      type SplayIterFunc func(*SplayNode)
+//      type IterFunc func(*SplayNode)
 //
 // Map calls the function for each SplayNode  in the specified order.
-func (t *SplayTree) Map(order TravOrder, f SplayIterFunc) {
+func (t *SplayTree) Map(order TravOrder, f IterFunc) {
 
+	if t.root == nil {
+		return
+	}
 	n := t.root
 	switch order {
 	case InOrder:
@@ -278,37 +223,19 @@ func (t *SplayTree) Map(order TravOrder, f SplayIterFunc) {
 				return
 			}
 			inorder(node.left)
-			f(node)
+			f(node.Elem)
 			inorder(node.right)
 		}
 		inorder(n)
-	case PreOrder:
-		var preorder func(node *SplayNode)
-		preorder = func(node *SplayNode) {
-			if node == nil {
-				return
-			}
-			f(node)
-			preorder(node.left)
-			preorder(node.right)
-		}
-		preorder(n)
-	case PostOrder:
-		var postorder func(node *SplayNode)
-		postorder = func(node *SplayNode) {
-			if node == nil {
-				return
-			}
-			postorder(node.left)
-			postorder(node.right)
-			f(node)
-		}
-		postorder(n)
 	default:
 		s := fmt.Sprintf("SplayTree has not implemented %s.", order)
 		panic(s)
 	}
 
+}
+
+func (t *SplayTree) Size() int {
+	return t.size
 }
 
 // Height returns the max depth of any branch of the tree
