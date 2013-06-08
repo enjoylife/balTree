@@ -7,12 +7,15 @@ type Tree interface {
 	Insert(item Interface) (old Interface)
 	Remove(item Interface) (old Interface)
 
+	Clear()
+	Size() int
 	Height() int
 	Min() Interface
 	Max() Interface
 
 	IterInit(order TravOrder) Interface
 	Next() Interface
+	Map(order TravOrder, f IterFunc)
 }
 
 // Our possible tree traversal ablitites
