@@ -111,6 +111,5 @@ type Interface interface {
 	Compare(Interface) Balance
 }
 type Byte interface {
-	Interface
 	ToBytes() []byte
 }
