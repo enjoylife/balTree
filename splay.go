@@ -24,6 +24,7 @@ func (t *SplayTree) Clear() {
 	t.last = nil
 	t.first = nil
 	t.size = 0
+	t.iterNext = nil
 	runtime.GC()
 }
 
