@@ -55,6 +55,7 @@ func (t *RBTree) Clear() {
 	t.first = nil
 	t.size = 0
 	t.height = 0
+	t.iterNext = nil
 	runtime.GC()
 }
 
