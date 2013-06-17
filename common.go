@@ -82,35 +82,27 @@ func (d Balance) String() string {
 
 // Interface is a one method interface type.
 // Types which implement a Compare method can be inserted into a Tree.
-// Compare returns a Balance with respect to the total order between the method calle and its given arguement.
-// Given:
-//
-//      bal = calle.Compare(arg):
-//
-// The result of bal must follow this logic:
-//
-//      if calle < arg {
-//          // ...
-//          return // bal == LT
-//      }
-//
-//      if calle > arg {
-//          // ...
-//          return // bal == GT
-//      }
-//      //bal == GT
-//
-//      if calle == arg {
-//          // ...
-//          return // bal == EQ
-//      }
-//
-//
-// Think of Compare as asking the question, "what is the calle's relationship to arg?"
-// Is the calle less than arg? Is it greater than, etc.
-
-// To Insert a type into the RBTree it must implement this one method interface.
 type Interface interface {
+	// Compare returns a Balance with respect to the total order between the method calle and its given arguement.
+	// Given:
+	//
+	//      bal = calle.Compare(arg):
+	//
+	// The result of bal must follow this logic:
+	//
+	//      if calle < arg {
+	//          return  LT
+	//      }
+	//
+	//      if calle > arg {
+	//          return  GT
+	//      }
+	//
+	//      if calle == arg {
+	//          return  EQ
+	//      }
+	// Think of Compare as asking the question, "what is the calle's relationship to arg?"
+	// Is the calle less than arg? Is it greater than? Or equal to?
 	Compare(Interface) Balance
 }
 type Byte interface {

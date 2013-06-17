@@ -258,6 +258,7 @@ func (t *SplayTree) Map(order TravOrder, f IterFunc) {
 
 }
 
+// Size returns the number of elements currently inserted in the tree.
 func (t *SplayTree) Size() int {
 	return t.size
 }

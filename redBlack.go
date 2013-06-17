@@ -46,6 +46,8 @@ type RBTree struct {
 func (t *RBTree) Height() int {
 	return t.height
 }
+
+// Size returns the number of elements currently inserted in the tree.
 func (t *RBTree) Size() int {
 	return t.size
 }
