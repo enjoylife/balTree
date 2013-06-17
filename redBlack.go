@@ -83,8 +83,8 @@ func (t *RBTree) Max() Interface {
 //
 //    sum := 0
 //    for i, n := 0, tree.IterInit(InOrder); n != nil; i, n = i+1, tree.Next() {
-//        elem := n.Elem.(exInt)  // (exInt is simple int type)
-//        sum += int(elem)
+//        elem := n.(exInt)  // (exInt is simple int type)
+//        sum += int(elem) + i
 //    }
 // Note: If one was to break out of the loop prior to a complete traversal,
 // and start another loop without calling IterInit, then the previously uncompleted iterator is continued again.
@@ -200,7 +200,7 @@ func (t *RBTree) IterInit(order TravOrder) Interface {
 // Map is a more performance orientated way to iterate over the elements of the tree.
 // Given a TravOrder and a function which conforms to the IterFunc type:
 //
-//      type IterFunc func(*RBNode)
+//      type IterFunc func(Interface)
 //
 // Map calls the function for each RBNode  in the specified order.
 func (t *RBTree) Map(order TravOrder, f IterFunc) {

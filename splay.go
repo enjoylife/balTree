@@ -152,8 +152,8 @@ func (t *SplayTree) Max() Interface {
 //
 //    sum := 0
 //    for i, n := 0, tree.IterInit(InOrder); n != nil; i, n = i+1, tree.Next() {
-//        elem := n.Elem.(exInt)  // (exInt is simple int type)
-//        sum += int(elem)
+//        elem := n.(exInt)  // (exInt is simple int type)
+//        sum += int(elem) + i
 //    }
 // Note: If one was to break out of the loop prior to a complete traversal,
 // and start another loop without calling IterInit, then the previously uncompleted iterator is continued again.
@@ -167,7 +167,7 @@ func (t *SplayTree) Next() Interface {
 }
 
 // IterInit is the initializer which setups the tree for iterating over it's elements in
-// a specific order. It setups the internal data, and then returns the first SplayNode to be looked at. See Next for an example.
+// a specific order. It setups the internal data, and then returns the first Interface to be looked at. See Next for an example.
 func (t *SplayTree) IterInit(order TravOrder) Interface {
 
 	current := t.root
@@ -205,11 +205,11 @@ func (t *SplayTree) IterInit(order TravOrder) Interface {
 }
 
 // Map is a more performance orientated way to iterate over the elements of the tree.
-// Given a TravOrder and a function which conforms to the RBIterFunc type:
+// Given a TravOrder and a function which conforms to the IterFunc type:
 //
-//      type IterFunc func(*SplayNode)
+//      type IterFunc func(Interface)
 //
-// Map calls the function for each SplayNode  in the specified order.
+// Map calls the function for each Interface type in the specified order.
 func (t *SplayTree) Map(order TravOrder, f IterFunc) {
 
 	if t.root == nil {
@@ -239,7 +239,8 @@ func (t *SplayTree) Size() int {
 	return t.size
 }
 
-// Height returns the max depth of any branch of the tree
+// Height returns the max depth of any branch of the tree.
+// Note: Runs in O(n) where n is the maximum depthed branch.
 func (t *SplayTree) Height() int {
 	var calc func(n *SplayNode) int
 	calc = func(n *SplayNode) int {
