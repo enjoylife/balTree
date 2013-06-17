@@ -31,6 +31,7 @@ type TravOrder int
 
 const (
 	InOrder TravOrder = iota
+	RevOrder
 	PreOrder
 	PostOrder
 	LevelOrder
@@ -49,6 +50,8 @@ func (order TravOrder) String() string {
 		s = "in-order traversal"
 	case LevelOrder:
 		s = "level-order traversal"
+	case RevOrder:
+		s = "reverse-order traversal"
 	}
 	return s
 }

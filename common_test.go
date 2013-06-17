@@ -430,6 +430,60 @@ func TestIterInorder(t *testing.T) {
 
 }
 
+func TestIterRevorder(t *testing.T) {
+
+	for _, v := range trees {
+		tree := v
+		tree.Clear()
+		//items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
+		items := []string{"i", "h", "g", "f", "e", "d", "c", "b", "a"}
+		for _, v := range items {
+			tree.Insert(exString(v))
+		}
+		var check Interface
+		if check = tree.Next(); check != nil {
+			t.Errorf("Didn't avoid a non intialized next call")
+		}
+
+		count := 0
+		for i, n := 0, tree.IterInit(RevOrder); n != nil; i, n = i+1, tree.Next() {
+
+			count++
+			if items[i] != string(n.(exString)) {
+				t.Errorf("Elems are in wrong order Got:%s, Exp: %s", n, items[i])
+			}
+
+		}
+		if count != len(items) {
+			t.Errorf("Did not traverse all elements missing: %d", len(items)-count)
+		}
+
+		if check = tree.Next(); check != nil {
+			t.Errorf("Didn't avoid a non intialized next call")
+		}
+
+		count = 0
+		exit := 3
+		for i, n := 0, tree.IterInit(RevOrder); n != nil; i, n = i+1, tree.Next() {
+			count++
+			if items[i] != string(n.(exString)) {
+				t.Errorf("Elems are in wrong order Got:%s, Exp: %s", n, items[i])
+			}
+			if i == exit {
+				break
+			}
+		}
+		// restart same iterator
+		for i, n := exit+1, tree.Next(); n != nil; i, n = i+1, tree.Next() {
+			count++
+			if items[i] != string(n.(exString)) {
+				t.Errorf("Elems are in wrong order Got:%s, Exp: %s", n, items[i])
+			}
+		}
+	}
+
+}
+
 func benchSearch(tree Tree) func(b *testing.B) {
 	tree.Clear()
 	return func(b *testing.B) {

@@ -126,6 +126,28 @@ func (t *RBTree) IterInit(order TravOrder) Interface {
 			}
 			return out
 		}
+	case RevOrder:
+		t.iterNext = func() (out Interface) {
+			for len(stack) > 0 || current != nil {
+				if current != nil {
+					stack = append(stack, current)
+					current = current.right
+				} else {
+					// pop
+					stackIndex := len(stack) - 1
+					current = stack[stackIndex]
+					out = current.Elem
+					stack = stack[0:stackIndex]
+					current = current.left
+					break
+				}
+			}
+			// last node, reset
+			if out == nil {
+				t.iterNext = nil
+			}
+			return out
+		}
 
 	case PreOrder:
 		t.iterNext = func() (out Interface) {
