@@ -1,3 +1,4 @@
+//  Provides reference based containers using tree or tree like data structures.
 package gotree
 
 import ()
@@ -26,7 +27,7 @@ type Tree interface {
 //     }
 type IterFunc func(Interface)
 
-// Our possible tree traversal ablitites
+// Our possible tree traversal abilities
 type TravOrder int
 
 const (
@@ -37,7 +38,7 @@ const (
 	LevelOrder
 )
 
-// implement the String interface for human readable names of traversal ablities
+// implement the String interface for human readable names of traversal abilities
 // used for debug and error reporting
 func (order TravOrder) String() string {
 	var s string
