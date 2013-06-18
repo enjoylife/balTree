@@ -1,5 +1,6 @@
-// TODO: accept initially empty strings for search, insertion and removal
 package gotree
+
+// TODO: accept initially empty strings for search, insertion and removal
 
 import (
 	"bytes"
@@ -179,9 +180,8 @@ func (burst *BurstTree) Search(item Byte) (found Byte) {
 		return
 	}
 
-	c := burst.root // current object
-	parent := burst.root.(*accessContainer)
-	// traverse down tree
+	c := burst.root                // interface
+	parent := c.(*accessContainer) // must always be non nil
 	for i := 0; ; i++ {
 		switch cOld := c.(type) {
 		case *accessContainer:
@@ -227,6 +227,10 @@ func (burst *BurstTree) Insert(item Byte) (old Byte) {
 
 	c := burst.root // current object
 	// we need the parent for we may burst and add an access tree which needs to be linked with it's proper parent
+	c := burst.root
+
+	// We need the parent for we may burst and add an
+	// access tree which needs to be linked with it's proper parent.
 	parent := burst.root.(*accessContainer)
 	for i := 0; i <= n; i++ {
 		switch cOld := c.(type) {
