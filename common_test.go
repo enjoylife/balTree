@@ -2,8 +2,10 @@ package gotree
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -44,6 +46,10 @@ func (this exInt) Compare(b Interface) Balance {
 }
 
 type exString string
+
+func (this exString) ToBytes() []byte {
+	return []byte(this)
+}
 
 func (this exString) Compare(b Interface) Balance {
 	var out Balance
@@ -619,9 +625,37 @@ func benchMap(tree Tree) func(b *testing.B) {
 	}
 }
 
+func benchText(tree Tree) func(b *testing.B) {
+
+	tree.Clear()
+	return func(b *testing.B) {
+		b.StopTimer()
+		content, err := ioutil.ReadFile("testText.txt")
+		if err != nil {
+			panic("Couldn't read in file to benchmark on")
+		}
+		data := strings.Fields(string(content))
+		fmt.Println(len(data))
+		b.StartTimer()
+		for i := 0; i < b.N; i++ {
+			for _, e := range data {
+				tree.Insert(exString(e))
+			}
+			fmt.Println("Tree Size", tree.Size())
+			tree.Clear()
+		}
+	}
+}
+
 func TestEfficiency(t *testing.T) {
 	var result testing.BenchmarkResult
 	fmt.Println("Starting Efficiency Functions")
+
+	fmt.Println("\nExample text file insert")
+	for _, v := range trees {
+		result = testing.Benchmark(benchText(v))
+		fmt.Printf("%-30T %s\n", v, result)
+	}
 
 	fmt.Println("\nRandom Search")
 	for _, v := range trees {
