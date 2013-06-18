@@ -17,7 +17,7 @@ const (
 //maxLen int = 2<<14 - 1 // two byte max
 )
 
-var listContainerMax int = 2
+var listContainerMax int = 128
 
 func init() {
 	//TODO Optimize listContainerMax prior to use
@@ -225,17 +225,25 @@ func (burst *BurstTree) Insert(item Byte) (old Byte) {
 		return
 	}
 
-	c := burst.root // current object
-	// we need the parent for we may burst and add an access tree which needs to be linked with it's proper parent
 	c := burst.root
 
 	// We need the parent for we may burst and add an
 	// access tree which needs to be linked with it's proper parent.
 	parent := burst.root.(*accessContainer)
-	for i := 0; i <= n; i++ {
+
+	for i := 0; ; i++ {
 		switch cOld := c.(type) {
 		case *accessContainer:
-			// use our current byte as index to next level of trie
+
+			// empty string case
+			if i == n {
+				old = cOld.single
+				cOld.single = item
+				if old == nil {
+					burst.size++
+				}
+				return
+			}
 			parent = cOld
 			c = cOld.records[query[i]]
 		case container:
@@ -248,24 +256,19 @@ func (burst *BurstTree) Insert(item Byte) (old Byte) {
 				burst.size++
 			}
 			return found
-		case nil: // need to add new
+		case nil:
 			suffix := query[i:]
-			// TODO: Try other concrete types of containers
-			newContainer := &listContainer{list.New(), nil}
-			old, _ = newContainer.insert(suffix, item)
+			newContainer := &listContainer{list.New(), nil} // TODO: Try other concrete types of containers
+			old, _ /*Should never burst */ = newContainer.insert(suffix, item)
 			parent.records[query[i-1]] = newContainer
 			burst.size++
 			return
 		}
 	}
-	// assumes that the container took care of the empty string case of insertion
-	// we have exhausted our string insert into empty string record for our last accessContainer
-	old = parent.single
-	if old == nil {
-		burst.size++
-	}
-	parent.single = item
-	return
+}
+
+func (burst *BurstTree) Size() int {
+	return burst.size
 }
 
 func (burst *BurstTree) Remove(item Byte) (old Byte) {

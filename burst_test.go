@@ -3,8 +3,31 @@ package gotree
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"io/ioutil"
+	"math/rand"
+	"strings"
 	"testing"
 )
+
+func BenchmarkBurstText(b *testing.B) {
+
+	listContainerMax = 256
+	b.StopTimer()
+	burst := &BurstTree{}
+	content, err := ioutil.ReadFile("testText.txt")
+	if err != nil {
+		panic("Couldn't read in file to benchmark on")
+	}
+	data := strings.Fields(string(content))
+	fmt.Println(len(data))
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		for _, e := range data {
+			burst.Insert(exString(e))
+		}
+		burst.Clear()
+	}
+}
 
 var _ = spew.Dump
 
@@ -39,6 +62,9 @@ func TestBurstInsert(t *testing.T) {
 		t.Errorf("Didn't create new container")
 
 	}
+	if s := burst.Size(); s != 1 {
+		t.Errorf("Size isn't proper")
+	}
 	old = burst.Insert(exByte{"aa"})
 	old = burst.Insert(exByte{"aab"})
 	if _, ok := burst.root.(*accessContainer).records['a'].(*accessContainer); !ok {
@@ -49,6 +75,10 @@ func TestBurstInsert(t *testing.T) {
 	a := exByte{"a"}
 	if a2 != a {
 		t.Errorf("Didn't add empty string single record")
+	}
+
+	if s := burst.Size(); s != 3 {
+		t.Errorf("Size isn't proper")
 	}
 }
 
@@ -79,15 +109,56 @@ func TestBurstSearch(t *testing.T) {
 
 func TestBurstInsertAndSearchAlot(t *testing.T) {
 	burst := &BurstTree{}
-	for i := 1; i < 100; i++ {
+	size := 1000
+	for i := 1; i < size+1; i++ {
 		s := fmt.Sprintf("%d", i)
 		burst.Insert(exByte{s})
 	}
-	for i := 1; i < 100; i++ {
+
+	if s := burst.Size(); s != size {
+		t.Errorf("Size isn't proper")
+	}
+	for i := 1; i < size+1; i++ {
 		s := fmt.Sprintf("%d", i)
 		check := burst.Search(exByte{s})
 		if check == nil {
 			t.Errorf("Should have found something")
+		}
+	}
+}
+
+func TestBurstInsertAndSearchRand(t *testing.T) {
+	burst := &BurstTree{}
+	size := 2000
+
+	data := rand.Perm(size)
+	size = 0
+	for _, i := range data {
+		if i != 0 {
+			size++
+			s := fmt.Sprintf("%d", i)
+
+			burst.Insert(exByte{s})
+		}
+	}
+	if s := burst.Size(); s != size {
+		t.Errorf("Size isn't proper")
+		t.Error("True:", size, " Found:", s)
+	}
+
+	if check := burst.root.(*accessContainer).single; check != nil {
+		t.Error("Should be nil in root record")
+	}
+
+	for _, i := range data {
+		if i != 0 {
+			s := fmt.Sprintf("%d", i)
+			check := burst.Search(exByte{s})
+			if check == nil {
+				t.Errorf("Should have found something")
+				t.Error(s)
+				t.Error(exByte{s})
+			}
 		}
 	}
 }
