@@ -1,0 +1,3 @@
+go test -run="Burst" -bench="Burst" -benchmem -cpuprofile cpu.out
+
+go tool pprof balTree.test cpu.out 
