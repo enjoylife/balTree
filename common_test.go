@@ -19,6 +19,11 @@ var trees = []Tree{&RBTree{}, &SplayTree{}}
 
 type exInt int
 
+func (this exInt) ToBytes() []byte {
+	// lol. don't use this approach in a prod env.
+	return []byte(strconv.Itoa(int(this)))
+}
+
 func (this exInt) Compare(b Interface) Balance {
 	var out Balance
 	switch that := b.(type) {
@@ -630,7 +635,7 @@ func benchText(tree Tree) func(b *testing.B) {
 	tree.Clear()
 	return func(b *testing.B) {
 		b.StopTimer()
-		content, err := ioutil.ReadFile("testText.txt")
+		content, err := ioutil.ReadFile("misc/testText.txt")
 		if err != nil {
 			panic("Couldn't read in file to benchmark on")
 		}
@@ -644,6 +649,15 @@ func benchText(tree Tree) func(b *testing.B) {
 			fmt.Println("Tree Size", tree.Size())
 			tree.Clear()
 		}
+	}
+}
+
+func BenchmarkText(b *testing.B) {
+
+	fmt.Println("\nExample text file insert")
+	for _, v := range trees {
+		result := testing.Benchmark(benchText(v))
+		fmt.Printf("%-30T %s\n", v, result)
 	}
 }
 

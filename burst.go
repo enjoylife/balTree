@@ -3,8 +3,7 @@ package gotree
 // TODO: accept initially empty strings for search, insertion and removal
 
 import (
-	"bytes"
-	"container/list"
+	//"container/list"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"runtime"
@@ -12,134 +11,10 @@ import (
 
 var _ = spew.Dump
 var _ = fmt.Println
-
-const (
-//maxLen int = 2<<14 - 1 // two byte max
-)
-
-var listContainerMax int = 128
+var containerMax int
 
 func init() {
-	//TODO Optimize listContainerMax prior to use
-}
-
-// All methods must handle empty string check too!!
-type container interface {
-	search(data []byte) (found Byte)
-	remove(suffix []byte) (old Byte)
-	// must replace this containers parent if newParent != nil, this is because this method
-	// might add to the tree depth if it feels the need to burst
-	insert(suffix []byte, item Byte) (old Byte, newParent *accessContainer)
-
-	hasElem() bool
-}
-
-type listContainer struct {
-	*list.List
-	single Byte // empty byte holder
-}
-
-type listElem struct {
-	key  []byte
-	item Byte
-}
-
-func (l *listContainer) search(data []byte) (found Byte) {
-	// take care of empty string case
-	if len(data) == 0 {
-		return l.single
-	}
-	for e := l.Front(); e != nil; e = e.Next() {
-		if bytes.Equal(data, e.Value.(*listElem).key) {
-			l.MoveToFront(e)
-			return e.Value.(*listElem).item
-		}
-	}
-	return
-}
-
-func (l *listContainer) hasElem() bool {
-	if l.single != nil || l.Len() > 0 {
-		return true
-	}
-	return false
-}
-
-func (l *listContainer) insert(suffix []byte, item Byte) (old Byte, newParent *accessContainer) {
-	if len(suffix) == 0 {
-		// empty string case
-		old = l.single
-		l.single = item
-		return
-	}
-	// search for previous old entry to return
-	for e := l.Front(); e != nil; e = e.Next() {
-		if bytes.Equal(suffix, e.Value.(*listElem).key) {
-			l.MoveToFront(e)
-			old = e.Value.(*listElem).item
-			return
-		}
-	}
-	// not found so add it in
-	l.PushFront(&listElem{suffix, item})
-
-	// check if we need to burst
-	if l.Len() > listContainerMax {
-		// add more depth to tree
-		newParent = &accessContainer{}
-		// transfer empty string
-		newParent.single = l.single
-		// transfer the rest
-		for e := l.Front(); e != nil; e = e.Next() {
-			elem := e.Value.(*listElem)
-			// byte to be removed
-			index := elem.key[0]
-			// remove byte
-			elem.key = elem.key[1:]
-			// if we have not created a new child yet create new child
-			// first check for empty string case
-			if newParent.records[index] == nil {
-				newContainer := &listContainer{list.New(), nil}
-				if len(elem.key) == 0 {
-					newContainer.single = elem.item
-				} else {
-					newContainer.PushBack(elem)
-
-				}
-				// set new child
-				newParent.records[index] = newContainer
-			} else {
-				if len(elem.key) == 0 {
-					newParent.records[index].(*listContainer).single = elem.item
-				} else {
-					newParent.records[index].(*listContainer).PushBack(elem)
-
-				}
-			}
-
-		}
-		l = nil
-		// remove our dead mem now, hopefully runtime will compact the scattered memory
-		runtime.GC()
-	}
-
-	return
-}
-
-func (l *listContainer) remove(suffix []byte) (old Byte) {
-	if len(suffix) == 0 {
-		// empty string case
-		old = l.single
-		l.single = nil
-		return
-	}
-	for e := l.Front(); e != nil; e = e.Next() {
-		if bytes.Equal(suffix, e.Value.(*listElem).key) {
-			old = l.Remove(e).(*listElem).item
-			return
-		}
-	}
-	return
+	containerMax = listContainerMax
 }
 
 // doesn't follow container interface for it's not a container but a "trie node"
@@ -151,14 +26,12 @@ type accessContainer struct {
 type BurstTree struct {
 	root     interface{}
 	size     int
-	height   int
 	iterNext func() Byte
 }
 
 func (burst *BurstTree) Clear() {
 	burst.root = nil
 	burst.size = 0
-	burst.height = 0
 	burst.iterNext = nil
 	runtime.GC()
 }
@@ -257,9 +130,11 @@ func (burst *BurstTree) Insert(item Byte) (old Byte) {
 			}
 			return found
 		case nil:
+			var newContainer container
 			suffix := query[i:]
-			newContainer := &listContainer{list.New(), nil} // TODO: Try other concrete types of containers
-			old, _ /*Should never burst */ = newContainer.insert(suffix, item)
+			newContainer = &compactArray{}
+			//newContainer := &listContainer{list.New(), nil} // TODO: Try other concrete types of containers
+			old, _ /*Should never burst,or else it's just a simple trie */ = newContainer.insert(suffix, item)
 			parent.records[query[i-1]] = newContainer
 			burst.size++
 			return
@@ -297,7 +172,6 @@ func (burst *BurstTree) Remove(item Byte) (old Byte) {
 			if i == n {
 				old = cOld.single
 				if old != nil {
-					//fmt.Println("empty String removing", item, "for", query[i-1])
 					burst.size--
 					cOld.single = nil
 					goto CheckEmpty
@@ -306,28 +180,23 @@ func (burst *BurstTree) Remove(item Byte) (old Byte) {
 			}
 			parent = cOld
 			parents = append(parents, cOld)
-			// use our current byte as index to next level of trie
 			c = cOld.records[query[i]]
 		case container:
 			suffix := query[i:]
 			old = cOld.remove(suffix)
 			if old != nil {
 				burst.size--
-				if !cOld.hasElem() {
-					//fmt.Println("removing empty string", item, "in", query[i-1])
+				if cOld.isEmpty() {
 					// remove empty container
 					parent.records[query[i-1]] = nil
-					//parents[len(parents)-1].records[query[i-1]] = nil
 				}
 				goto CheckEmpty
 			}
 			return // found nothing
 
 		case nil:
-			//fmt.Println("Found Nil for", item)
 			// if present only possible place is last access container
 			old = parent.single
-			//parent := parents[len(parents)-1]
 			if old != nil {
 				burst.size--
 				parent.single = nil
@@ -356,4 +225,104 @@ CheckEmpty:
 
 	}
 	return
+}
+
+func (burst *BurstTree) Next() (next Byte) {
+	return burst.iterNext()
+}
+
+type iter struct {
+	index int
+	it    *accessContainer
+}
+
+func (burst *BurstTree) IterInit(order TravOrder) (start Byte) {
+	//TODO: test and corner case elmination
+	//TODO: output key as well
+	if burst.root == nil {
+		start = nil
+		return
+	}
+	var cIter func() ([]byte, Byte)
+	// should we output from a container
+	isC := false
+
+	current := burst.root.(*accessContainer)
+	stack := []iter{}
+
+	index := -1
+	switch order {
+	case InOrder:
+		burst.iterNext = func() (out Byte) {
+			// we need to keep trying to go down levels, once we hit either a nill or container,
+			// we need to either output all the containers items in order or ignore the nil.
+			// Then continue traversing the rest of the record array.
+			// We have to pay attention to the current record index as we continue going down the levels
+			// so when we come back up we are at the spot we were when we started traversing down.
+		Dive:
+			for {
+				// output containers items first
+				if isC {
+					// TODO stop ignoring key
+					_, out = cIter()
+					if out != nil {
+						return
+					} else {
+						isC = false
+					}
+
+				}
+
+				// output an empty string before more traversal
+				if index == -1 {
+					index++
+					if current.single != nil {
+						out = current.single
+						break
+					}
+				}
+				for index < 255 {
+					switch cur := current.records[index].(type) {
+					case *accessContainer:
+
+						index++
+						stack = append(stack, iter{index, current})
+						current = cur // go down one more level
+						index = -1
+						goto Dive
+					case container:
+						cIter = cur.iter(order)
+						if cIter != nil {
+							isC = true
+						}
+						index++
+						goto Dive
+					case nil:
+						index++
+					}
+				}
+				if len(stack) > 0 {
+					// pop
+					stackIndex := len(stack) - 1
+					s := stack[stackIndex]
+					current, index = s.it, s.index
+					stack = stack[0:stackIndex]
+				} else {
+					out = nil
+					// last node, reset
+					burst.iterNext = nil
+					return
+
+				}
+			}
+			return out
+		}
+		return burst.iterNext()
+	case RevOrder:
+		//TODO
+	}
+	return
+}
+func (burst *BurstTree) Map(order TravOrder, f ByteIterFunc) {
+	//TODO
 }

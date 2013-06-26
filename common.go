@@ -3,6 +3,18 @@ package gotree
 
 import ()
 
+type ByteTree interface {
+	Search(item Byte) (found Byte)
+	Insert(item Byte) (found Byte)
+	Remove(item Byte) (found Byte)
+	Size() int
+	Clear()
+
+	IterInit(order TravOrder) Byte
+	Next() Byte
+	Map(order TravOrder, f ByteIterFunc)
+}
+
 type Tree interface {
 	Search(item Interface) (found Interface)
 	Insert(item Interface) (old Interface)
@@ -27,6 +39,8 @@ type Tree interface {
 //     }
 type IterFunc func(Interface)
 
+type ByteIterFunc func(Byte)
+
 // Our possible tree traversal abilities
 type TravOrder int
 
@@ -36,6 +50,8 @@ const (
 	PreOrder
 	PostOrder
 	LevelOrder
+	AnyOrder
+	RandOrder
 )
 
 // implement the String interface for human readable names of traversal abilities
@@ -106,6 +122,7 @@ type Interface interface {
 	// Is the calle less than arg? Is it greater than? Or equal to?
 	Compare(Interface) Balance
 }
+
 type Byte interface {
 	ToBytes() []byte
 }
