@@ -1,4 +1,6 @@
-//  Provides reference based containers using tree or tree like data structures.
+// Provides reference based containers using tree or tree like data structures.
+// Two types of trees are available based upon the abilities of the to be inserted data.
+// A general type that has a total order and a type which can be represented by a byte array.
 package gotree
 
 import ()
@@ -44,6 +46,10 @@ type ByteIterFunc func(Byte)
 // Our possible tree traversal abilities
 type TravOrder int
 
+// InOrder items are visted from smallest to largest, while RevOrder visits them from largest to smallest.
+// LevelOrder, PreOrder, PostOrder are dependent on the shape and layout of the underlying tree.
+// AnyOrder is where the algorithm is chosen for performance reasons.
+// RandOrder, items are visted in a uniformly random order.
 const (
 	InOrder TravOrder = iota
 	RevOrder
