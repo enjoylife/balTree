@@ -1,6 +1,6 @@
 package gotree
 
-// TODO: accept initially empty strings for search, insertion and removal
+// TODO: accept empty strings for search, insertion and removal
 
 import (
 	//"container/list"
@@ -231,12 +231,13 @@ func (burst *BurstTree) Next() (next Byte) {
 	return burst.iterNext()
 }
 
-type iter struct {
-	index int
-	it    *accessContainer
-}
-
 func (burst *BurstTree) IterInit(order TravOrder) (start Byte) {
+
+	type iter struct {
+		index int
+		it    *accessContainer
+	}
+
 	//TODO: test and corner case elmination
 	//TODO: output key as well
 	if burst.root == nil {
@@ -320,9 +321,14 @@ func (burst *BurstTree) IterInit(order TravOrder) (start Byte) {
 		return burst.iterNext()
 	case RevOrder:
 		//TODO
+
+	default:
+		s := fmt.Sprintf("BurstTree has not implemented %s for iteration.", order)
+		panic(s)
 	}
 	return
 }
+
 func (burst *BurstTree) Map(order TravOrder, f ByteIterFunc) {
 	//TODO
 }
